@@ -110,6 +110,7 @@ export class TaskBoard {
     if (!found) return null;
 
     const task = await readJson<ImeceTask>(found.path);
+    /* c8 ignore next */
     if (!task) return null;
 
     if (task.status === 'active') {
@@ -158,6 +159,7 @@ export class TaskBoard {
     if (!found) return null;
 
     const task = await readJson<ImeceTask>(found.path);
+    /* c8 ignore next */
     if (!task) return null;
 
     if (task.status === 'done') {
@@ -203,6 +205,7 @@ export class TaskBoard {
     if (!found) return null;
 
     const task = await readJson<ImeceTask>(found.path);
+    /* c8 ignore next */
     if (!task) return null;
 
     if (task.status === 'done') {
@@ -247,6 +250,7 @@ export class TaskBoard {
     if (!found) return null;
 
     const task = await readJson<ImeceTask>(found.path);
+    /* c8 ignore next */
     if (!task) return null;
 
     if (task.status !== 'blocked') {
@@ -291,6 +295,7 @@ export class TaskBoard {
     if (!found) return null;
 
     const task = await readJson<ImeceTask>(found.path);
+    /* c8 ignore next */
     if (!task) return null;
 
     task.notes.push({

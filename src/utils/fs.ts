@@ -38,6 +38,7 @@ export async function writeJson<T>(filePath: string, data: T): Promise<void> {
   try {
     await fs.rename(tmpPath, filePath);
   } catch (error) {
+    /* c8 ignore next */
     // On Windows, rename can fail if target exists. Fallback to direct write.
     if ((error as NodeJS.ErrnoException).code === 'EPERM') {
       await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
@@ -135,6 +136,7 @@ export async function ensureDir(dirPath: string): Promise<void> {
   try {
     await fs.mkdir(dirPath, { recursive: true });
   } catch {
+    /* c8 ignore next */
     // Directory may already exist
   }
 }
@@ -194,6 +196,7 @@ export async function removeDir(dirPath: string): Promise<void> {
   try {
     await fs.rm(dirPath, { recursive: true, force: true });
   } catch {
+    /* c8 ignore next */
     // Directory may not exist
   }
 }

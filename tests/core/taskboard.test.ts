@@ -106,6 +106,40 @@ describe('TaskBoard', () => {
         imece.tasks.claim(task.id, 'ali')
       ).rejects.toThrow('already claimed');
     });
+
+    it('should throw if already completed', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test'
+      });
+
+      await imece.tasks.claim(task.id, 'zeynep');
+      await imece.tasks.complete(task.id);
+
+      await expect(
+        imece.tasks.claim(task.id, 'zeynep')
+      ).rejects.toThrow('already completed');
+    });
+
+    it('should throw if blocked by dependencies', async () => {
+      const dep = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Dependency'
+      });
+
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test',
+        blockedBy: [dep.id]
+      });
+
+      await expect(
+        imece.tasks.claim(task.id, 'zeynep')
+      ).rejects.toThrow('blocked by dependencies');
+    });
   });
 
   describe('complete', () => {
@@ -184,6 +218,36 @@ describe('TaskBoard', () => {
       expect(unblocked?.status).toBe('pending');
     });
 
+    it('should throw if trying to block completed task', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test'
+      });
+
+      await imece.tasks.claim(task.id, 'zeynep');
+      await imece.tasks.complete(task.id);
+
+      await expect(
+        imece.tasks.block(task.id, 'Cannot block')
+      ).rejects.toThrow('Cannot block completed');
+    });
+
+    it('should throw if task already blocked', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test'
+      });
+
+      await imece.tasks.claim(task.id, 'zeynep');
+      await imece.tasks.block(task.id, 'Waiting');
+
+      await expect(
+        imece.tasks.block(task.id, 'Already blocked')
+      ).rejects.toThrow('already blocked');
+    });
+
     it('should throw if not blocked when unblocking', async () => {
       const task = await imece.tasks.create({
         createdBy: 'ali',
@@ -194,6 +258,11 @@ describe('TaskBoard', () => {
       await expect(
         imece.tasks.unblock(task.id)
       ).rejects.toThrow('not blocked');
+    });
+
+    it('should return null for non-existent task', async () => {
+      const result = await imece.tasks.unblock('nonexistent');
+      expect(result).toBeNull();
     });
   });
 
@@ -209,6 +278,11 @@ describe('TaskBoard', () => {
       expect(updated?.notes).toHaveLength(1);
       expect(updated?.notes[0]?.text).toBe('Progress update');
       expect(updated?.notes[0]?.agent).toBe('zeynep');
+    });
+
+    it('should return null for non-existent task', async () => {
+      const updated = await imece.tasks.addNote('nonexistent', 'zeynep', 'Note');
+      expect(updated).toBeNull();
     });
   });
 
@@ -321,6 +395,47 @@ describe('TaskBoard', () => {
       await imece.tasks.complete(dep.id);
 
       expect(await imece.tasks.isUnblocked(task.id)).toBe(true);
+    });
+
+    it('should return false for non-existent task', async () => {
+      expect(await imece.tasks.isUnblocked('nonexistent')).toBe(false);
+    });
+  });
+
+  describe('delegate', () => {
+    it('should delegate task via messenger', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test task',
+        description: 'Test description',
+        priority: 'high'
+      });
+
+      const message = await imece.tasks.delegate(task, imece.messages);
+
+      expect(message.from).toBe('ali');
+      expect(message.to).toBe('zeynep');
+      expect(message.subject).toBe('Test task');
+      expect(message.body).toContain('Test description');
+      expect(message.priority).toBe('high');
+    });
+
+    it('should include acceptance criteria when present', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test task',
+        description: 'Test description',
+        acceptanceCriteria: ['Criteria 1', 'Criteria 2'],
+        priority: 'normal'
+      });
+
+      const message = await imece.tasks.delegate(task, imece.messages);
+
+      expect(message.body).toContain('Acceptance Criteria');
+      expect(message.body).toContain('Criteria 1');
+      expect(message.body).toContain('Criteria 2');
     });
   });
 });

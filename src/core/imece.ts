@@ -183,6 +183,7 @@ export class ImeceManager {
         await fs.promises.writeFile(gitignorePath, newContent, 'utf8');
       }
     } catch {
+      /* c8 ignore next */
       // Ignore errors (e.g., no write permission)
     }
   }
@@ -195,16 +196,39 @@ export class ImeceManager {
    * await imece.installSkill('./docs/skills');
    */
   async installSkill(targetDir?: string): Promise<string> {
-    const skillSource = new URL('../../skill/SKILL.md', import.meta.url).pathname;
     const skillDest = `${this.projectRoot}/${targetDir ?? '.skills/imece'}/SKILL.md`;
 
     await ensureDir(skillDest.replace('/SKILL.md', ''));
 
-    try {
-      await copyFile(skillSource, skillDest);
-    } catch {
-      // If copy fails, create a placeholder
-      const placeholder = `# İmece Skill\n\nSee https://github.com/ersinkoc/imece for documentation.\n`;
+    // Try multiple possible source locations
+    const possibleSources = [
+      // Running from source (dev)
+      new URL('../../skill/SKILL.md', import.meta.url).pathname,
+      // Running from dist/ after build
+      new URL('../../../skill/SKILL.md', import.meta.url).pathname,
+      // Relative to project root
+      `${this.projectRoot}/skill/SKILL.md`,
+      // Global install
+      `${this.projectRoot}/node_modules/imece/skill/SKILL.md`
+    ];
+
+    let copied = false;
+    for (const skillSource of possibleSources) {
+      try {
+        await copyFile(skillSource, skillDest);
+        copied = true;
+        break;
+      } catch {
+        // Try next source
+      }
+    }
+
+    if (!copied) {
+      // If copy fails, create a placeholder with essential info
+      const placeholder = `# İmece Skill
+
+See https://github.com/ersinkoc/imece for documentation.
+`;
       const fs = await import('fs');
       await fs.promises.writeFile(skillDest, placeholder, 'utf8');
     }

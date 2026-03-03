@@ -131,4 +131,64 @@ describe('ImeceManager', () => {
       expect(await imece.isInitialized()).toBe(false);
     });
   });
+
+  describe('setupGitignore', () => {
+    it('should add .imece/ to .gitignore', async () => {
+      await imece.init();
+
+      await imece.setupGitignore();
+
+      const fs = await import('fs/promises');
+      const content = await fs.readFile(`${tempDir}/.gitignore`, 'utf8');
+      expect(content).toContain('.imece/');
+    });
+
+    it('should handle existing .gitignore without newline at end', async () => {
+      const fs = await import('fs/promises');
+      await fs.writeFile(`${tempDir}/.gitignore`, 'existing-content', 'utf8');
+      await imece.init();
+
+      await imece.setupGitignore();
+
+      const content = await fs.readFile(`${tempDir}/.gitignore`, 'utf8');
+      expect(content).toContain('.imece/');
+      expect(content).toContain('existing-content');
+    });
+
+    it('should not duplicate entry if already exists', async () => {
+      const fs = await import('fs/promises');
+      await fs.writeFile(`${tempDir}/.gitignore`, '.imece/\n', 'utf8');
+      await imece.init();
+
+      await imece.setupGitignore();
+
+      const content = await fs.readFile(`${tempDir}/.gitignore`, 'utf8');
+      const matches = content.match(/\.imece\//g);
+      expect(matches?.length).toBe(1);
+    });
+  });
+
+  describe('installSkill', () => {
+    it('should install skill file with content', async () => {
+      await imece.init();
+
+      const skillPath = await imece.installSkill();
+
+      const fs = await import('fs/promises');
+      const content = await fs.readFile(skillPath, 'utf8');
+      expect(content.length).toBeGreaterThan(0); // File should have content
+      expect(content).toContain('imece'); // Should contain the protocol name
+    });
+
+    it('should install to custom directory', async () => {
+      await imece.init();
+
+      const skillPath = await imece.installSkill('.docs/skills');
+
+      expect(skillPath).toContain('.docs/skills');
+      const fs = await import('fs/promises');
+      const exists = await fs.access(skillPath).then(() => true).catch(() => false);
+      expect(exists).toBe(true);
+    });
+  });
 });

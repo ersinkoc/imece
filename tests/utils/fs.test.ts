@@ -10,7 +10,10 @@ import {
   ensureDir,
   exists,
   removeFile,
-  removeDir
+  removeDir,
+  moveFile,
+  readDir,
+  copyFile
 } from '../../src/utils/fs.js';
 
 const TEST_DIR = join(process.cwd(), '.test-fs', Date.now().toString(36));
@@ -200,6 +203,89 @@ describe('File system utilities', () => {
 
     it('should not fail for non-existent file', async () => {
       await expect(removeFile(join(TEST_DIR, 'nonexistent.txt'))).resolves.not.toThrow();
+    });
+  });
+
+  describe('moveFile', () => {
+    it('should move file to new location', async () => {
+      const fromPath = join(TEST_DIR, 'source.json');
+      const toPath = join(TEST_DIR, 'moved', 'dest.json');
+      await fs.writeFile(fromPath, '{"test":true}', 'utf8');
+
+      await moveFile(fromPath, toPath);
+
+      expect(await exists(fromPath)).toBe(false);
+      expect(await exists(toPath)).toBe(true);
+      const content = await fs.readFile(toPath, 'utf8');
+      expect(JSON.parse(content)).toEqual({ test: true });
+    });
+
+    it('should create target directory', async () => {
+      const fromPath = join(TEST_DIR, 'source.json');
+      const toPath = join(TEST_DIR, 'deep', 'nested', 'dest.json');
+      await fs.writeFile(fromPath, '{}', 'utf8');
+
+      await moveFile(fromPath, toPath);
+
+      expect(await exists(toPath)).toBe(true);
+    });
+  });
+
+  describe('readDir', () => {
+    it('should read directory contents', async () => {
+      await fs.writeFile(join(TEST_DIR, 'file1.txt'), '', 'utf8');
+      await fs.writeFile(join(TEST_DIR, 'file2.txt'), '', 'utf8');
+      await fs.mkdir(join(TEST_DIR, 'subdir'));
+
+      const entries = await readDir(TEST_DIR);
+      expect(entries).toContain('file1.txt');
+      expect(entries).toContain('file2.txt');
+      expect(entries).toContain('subdir');
+    });
+
+    it('should return empty array for non-existent directory', async () => {
+      const entries = await readDir(join(TEST_DIR, 'nonexistent'));
+      expect(entries).toEqual([]);
+    });
+  });
+
+  describe('copyFile', () => {
+    it('should copy file', async () => {
+      const fromPath = join(TEST_DIR, 'source.json');
+      const toPath = join(TEST_DIR, 'copy.json');
+      await fs.writeFile(fromPath, '{"copied":true}', 'utf8');
+
+      await copyFile(fromPath, toPath);
+
+      expect(await exists(toPath)).toBe(true);
+      const content = await fs.readFile(toPath, 'utf8');
+      expect(JSON.parse(content)).toEqual({ copied: true });
+    });
+
+    it('should create target directory', async () => {
+      const fromPath = join(TEST_DIR, 'source.json');
+      const toPath = join(TEST_DIR, 'deep', 'copy.json');
+      await fs.writeFile(fromPath, '{}', 'utf8');
+
+      await copyFile(fromPath, toPath);
+
+      expect(await exists(toPath)).toBe(true);
+    });
+  });
+
+  describe('removeDir', () => {
+    it('should remove directory recursively', async () => {
+      const dirPath = join(TEST_DIR, 'to-remove');
+      await fs.mkdir(dirPath);
+      await fs.writeFile(join(dirPath, 'file.txt'), '', 'utf8');
+
+      await removeDir(dirPath);
+
+      expect(await exists(dirPath)).toBe(false);
+    });
+
+    it('should not fail for non-existent directory', async () => {
+      await expect(removeDir(join(TEST_DIR, 'nonexistent'))).resolves.not.toThrow();
     });
   });
 });

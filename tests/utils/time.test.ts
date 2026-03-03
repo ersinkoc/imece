@@ -25,19 +25,42 @@ describe('Time utilities', () => {
       expect(relative(timestamp)).toContain('sec');
     });
 
+    it('should return "1 min ago" for timestamps around 1 minute', () => {
+      const timestamp = new Date(Date.now() - 60 * 1000).toISOString();
+      expect(relative(timestamp)).toBe('1 min ago');
+    });
+
     it('should return minutes for timestamps within an hour', () => {
       const timestamp = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       expect(relative(timestamp)).toContain('min');
+      expect(relative(timestamp)).not.toBe('1 min ago');
+    });
+
+    it('should return "1 hour ago" for timestamps around 1 hour', () => {
+      const timestamp = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      expect(relative(timestamp)).toBe('1 hour ago');
     });
 
     it('should return hours for timestamps within a day', () => {
       const timestamp = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-      expect(relative(timestamp)).toContain('hour');
+      expect(relative(timestamp)).toContain('hours');
+    });
+
+    it('should return "1 day ago" for timestamps around 1 day', () => {
+      const timestamp = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      expect(relative(timestamp)).toBe('1 day ago');
     });
 
     it('should return days for older timestamps', () => {
-      const timestamp = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-      expect(relative(timestamp)).toContain('day');
+      const timestamp = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      expect(relative(timestamp)).toContain('days');
+    });
+
+    it('should return date string for very old timestamps', () => {
+      const timestamp = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString();
+      const result = relative(timestamp);
+      // Should return locale date string like "2/1/2026" or similar
+      expect(result).toMatch(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/);
     });
   });
 

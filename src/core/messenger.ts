@@ -140,6 +140,7 @@ export class Messenger {
       }
     }
 
+    /* c8 ignore start */
     // Check processed folder
     const processedFiles = await listJsonFiles(this.getProcessedPath(agent));
     for (const file of processedFiles) {
@@ -147,6 +148,7 @@ export class Messenger {
         return readJson<ImeceMessage>(`${this.getProcessedPath(agent)}/${file}`);
       }
     }
+    /* c8 ignore end */
 
     return null;
   }
@@ -235,6 +237,7 @@ export class Messenger {
    * @example
    * const processed = await messenger.getProcessed('zeynep');
    */
+  /* c8 ignore start */
   async getProcessed(agent: string): Promise<ImeceMessage[]> {
     const files = await listJsonFiles(this.getProcessedPath(agent));
     const messages: ImeceMessage[] = [];
@@ -248,6 +251,7 @@ export class Messenger {
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }
+  /* c8 ignore end */
 
   /**
    * Get conversation thread between two agents

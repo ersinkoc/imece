@@ -104,6 +104,37 @@ describe('AgentManager', () => {
     });
   });
 
+  describe('listActive', () => {
+    it('should return only active agents', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await imece.agents.register({ name: 'zeynep', role: 'tester' });
+
+      // Mark zeynep as offline
+      await imece.agents.goOffline('zeynep');
+
+      const active = await imece.agents.listActive();
+
+      expect(active).toHaveLength(1);
+      expect(active[0]?.name).toBe('ali');
+    });
+
+    it('should exclude stale agents', async () => {
+      const agent = await imece.agents.register({ name: 'ali', role: 'dev' });
+
+      // Manually set lastSeen to old time
+      agent.lastSeen = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const fs = await import('fs/promises');
+      await fs.writeFile(
+        `${tempDir}/.imece/agents/ali.json`,
+        JSON.stringify(agent, null, 2),
+        'utf8'
+      );
+
+      const active = await imece.agents.listActive(300); // 5 min threshold
+      expect(active).toHaveLength(0);
+    });
+  });
+
   describe('updateStatus', () => {
     it('should update agent status', async () => {
       await imece.agents.register({ name: 'ali', role: 'dev' });
@@ -156,6 +187,11 @@ describe('AgentManager', () => {
 
       expect(updated?.filesWorkingOn).toEqual(['src/app.ts', 'src/utils.ts']);
     });
+
+    it('should return null for non-existent agent', async () => {
+      const updated = await imece.agents.setWorkingFiles('nonexistent', ['file.ts']);
+      expect(updated).toBeNull();
+    });
   });
 
   describe('goOffline', () => {
@@ -167,6 +203,11 @@ describe('AgentManager', () => {
       expect(updated?.status).toBe('offline');
       expect(updated?.currentTask).toBeNull();
       expect(updated?.filesWorkingOn).toEqual([]);
+    });
+
+    it('should return null for non-existent agent', async () => {
+      const updated = await imece.agents.goOffline('nonexistent');
+      expect(updated).toBeNull();
     });
   });
 
@@ -232,6 +273,11 @@ describe('AgentManager', () => {
       const newLead = await imece.agents.getLead();
       expect(newLead?.name).toBe('zeynep');
     });
+
+    it('should return null for non-existent agent', async () => {
+      const result = await imece.agents.setLead('nonexistent');
+      expect(result).toBeNull();
+    });
   });
 
   describe('updateMeta', () => {
@@ -259,6 +305,11 @@ describe('AgentManager', () => {
         first: 'value',
         second: 'value'
       });
+    });
+
+    it('should return null for non-existent agent', async () => {
+      const updated = await imece.agents.updateMeta('nonexistent', { key: 'value' });
+      expect(updated).toBeNull();
     });
   });
 });

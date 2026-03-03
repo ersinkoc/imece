@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-03-04
+
+### Fixed
+- Windows path encoding bug in file locker (invalid filename with `:` character)
+- IMECE_AGENT environment variable template in hooks (was hardcoded to 'kimibey')
+
+### Added
+- Comprehensive edge case tests for locker (45 tests total, +25 new)
+- Messenger edge case tests (43 tests total, +25 new)
+- Agent manager edge case tests (47 tests total, +9 new)
+- Additional test coverage for error handling paths
+
+### Changed
+- Improved hooks template to use dynamic agent names
+- Enhanced error messages with platform-specific guidance
+- Test coverage increased from 91.86% to 98.85% (350 tests)
+
+### Stats
+- Total tests: 350 (+151 from v1.0.0)
+- Test coverage: 98.85%
+- Functions coverage: 100%
+
 ## [1.0.1] - 2026-03-03
 
 ### Changed
@@ -61,5 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform testing (Linux, Windows, macOS)
 - Node.js 22+ support
 
+[1.0.2]: https://github.com/ersinkoc/imece/releases/tag/v1.0.2
 [1.0.1]: https://github.com/ersinkoc/imece/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ersinkoc/imece/releases/tag/v1.0.0

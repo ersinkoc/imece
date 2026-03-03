@@ -1,6 +1,6 @@
 {
   "name": "@oxog/imece",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Universal multi-agent coordination for AI code assistants — like imece, the Anatolian tradition of working together",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,11 +30,31 @@
     "ci": "npm run typecheck && npm run test && npm run build",
     "prepublishOnly": "npm run ci && npm run test:coverage"
   },
-  "files": ["dist", "templates", "skill", "llms.txt", "CHANGELOG.md", "LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "templates",
+    "skill",
+    "commands",
+    "llms.txt",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
   "keywords": [
-    "multi-agent", "imece", "coordination", "claude-code",
-    "ai-assistant", "ipc", "cursor", "windsurf", "copilot",
-    "cline", "aider", "task-delegation", "agent-teams", "swarm"
+    "multi-agent",
+    "imece",
+    "coordination",
+    "claude-code",
+    "ai-assistant",
+    "ipc",
+    "cursor",
+    "windsurf",
+    "copilot",
+    "cline",
+    "aider",
+    "task-delegation",
+    "agent-teams",
+    "swarm"
   ],
   "author": "Ersin Koç",
   "license": "MIT",
@@ -43,13 +63,15 @@
     "url": "git+https://github.com/ersinkoc/imece.git"
   },
   "homepage": "https://github.com/ersinkoc/imece",
-  "engines": { "node": ">=22" },
-  "dependencies": {},
+  "engines": {
+    "node": ">=22"
+  },
   "devDependencies": {
-    "typescript": "^5.8.0",
-    "vitest": "^3.0.0",
+    "@oxog/imece": "^1.0.1",
+    "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^3.0.0",
     "tsup": "^8.0.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
   }
 }

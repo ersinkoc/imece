@@ -97,6 +97,7 @@ ${colors.bold}Message Commands:${colors.reset}
   send <from> <to> <subject>        Send a message
          [--body <text>] [--type <t>] [--priority <p>]
   inbox <agent> [--all]             Check inbox
+  check <agent> [--auto]            Full check (msgs, tasks, locks)
   read <agent> <msg-id>             Mark message as read
   reply <agent> <msg-id> <body>     Reply to message
   thread <a1> <a2>                  Show conversation thread
@@ -124,8 +125,17 @@ ${colors.bold}Lock Commands:${colors.reset}
   unlock <agent> <filepath>         Unlock a file
   locks                             List active locks
 
+${colors.bold}Quick Commands:${colors.reset}
+  join [--name <n>] [--role <r>]    Quick agent registration
+  test <filepath> [--to <agent>]    Delegate test task to tester
+  review <filepath> [--from <a>]    Request code review
+  assign <title> --to-role <role>   Assign task by role
+  notify <from> <message>           Notify all online agents
+  standup                           Show team standup summary
+
 ${colors.bold}Skill Commands:${colors.reset}
   install-skill [--dir <path>]      Install SKILL.md
+  install-commands [--dir <path>]   Install AI tool commands
   prompt <name> <role> [opts]       Generate agent prompt
                                     --caps <c1,c2>  Capabilities
                                     --model <m>     AI model
@@ -462,6 +472,86 @@ async function handleRead(args: ParsedArgs): Promise<void> {
   }
 
   success(`Marked as read: ${msg.subject}`);
+}
+
+async function handleCheck(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+  const agent = args.args[0] || process.env.IMECE_AGENT;
+
+  if (!agent) {
+    error('Usage: imece check <agent>');
+    console.log('\nOr set IMECE_AGENT env variable');
+    process.exit(1);
+  }
+
+  // Send heartbeat
+  await imece.agents.heartbeat(agent);
+
+  // Check inbox
+  const messages = await imece.messages.getInbox(agent);
+  const unread = messages.filter(m => !m.read);
+
+  if (unread.length > 0) {
+    console.log(colors.bold + '📬 NEW MESSAGES (' + unread.length + ')' + colors.reset);
+    for (const msg of unread) {
+      console.log('\n  📨 From: ' + colors.cyan + msg.from + colors.reset);
+      console.log('     Subject: ' + colors.yellow + msg.subject + colors.reset);
+      if (msg.body) {
+        const preview = msg.body.length > 100 ? msg.body.substring(0, 100) + '...' : msg.body;
+        console.log('     ' + colors.gray + preview + colors.reset);
+      }
+      // Auto mark as read if --auto flag
+      if (args.flags.auto) {
+        await imece.messages.markAsRead(agent, msg.id);
+      }
+    }
+    if (!args.flags.auto) {
+      console.log('\n  ' + colors.dim + 'Mark as read: imece read ' + agent + ' <msg-id>' + colors.reset);
+    }
+  } else {
+    info('No new messages');
+  }
+
+  // Check tasks
+  const tasks = await imece.tasks.getAgentTasks(agent);
+  const pending = tasks.filter(t => t.status === 'pending');
+  const active = tasks.filter(t => t.status === 'active');
+
+  if (active.length > 0) {
+    console.log('\n' + colors.bold + '🔄 ACTIVE TASKS (' + active.length + ')' + colors.reset);
+    for (const task of active) {
+      console.log('  • ' + task.title + ' (from: ' + task.createdBy + ')');
+    }
+  }
+
+  if (pending.length > 0) {
+    console.log('\n' + colors.bold + '📋 PENDING TASKS (' + pending.length + ')' + colors.reset);
+    for (const task of pending.slice(0, 3)) {
+      console.log('  • ' + task.title);
+      console.log('    ' + colors.dim + 'Claim: imece task claim ' + task.id + ' ' + agent + colors.reset);
+    }
+  }
+
+  // Check locks
+  const locks = await imece.locks.agentLocks(agent);
+  if (locks.length > 0) {
+    console.log('\n' + colors.bold + '🔒 YOUR LOCKS (' + locks.length + ')' + colors.reset);
+    for (const lock of locks) {
+      console.log('  • ' + lock.file);
+    }
+  }
+
+  // Timeline summary
+  const recentEvents = await imece.timeline.recent(5);
+  const relevantEvents = recentEvents.filter(e => e.agent !== agent);
+  if (relevantEvents.length > 0) {
+    console.log('\n' + colors.bold + '📢 TEAM ACTIVITY' + colors.reset);
+    for (const event of relevantEvents) {
+      console.log('  [' + event.agent + '] ' + event.message);
+    }
+  }
+
+  console.log('\n' + colors.green + '✓ Check complete' + colors.reset);
 }
 
 async function handleReply(args: ParsedArgs): Promise<void> {
@@ -872,6 +962,346 @@ async function handleTaskDelegate(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function handleJoin(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+
+  if (!(await imece.isInitialized())) {
+    error('imece is not initialized. Run: imece init');
+    process.exit(1);
+  }
+
+  const name = (args.flags.name as string | undefined) ?? args.args[0];
+  const role = (args.flags.role as string | undefined) ?? args.args[1];
+  const caps = (args.flags.caps as string | undefined)?.split(',').map(c => c.trim()) ?? [];
+  const model = (args.flags.model as string | undefined) ?? detectModel();
+  const isLead = args.flags.lead === true;
+
+  if (!name || !role) {
+    console.log('\n' + colors.bold + colors.cyan + 'imece Agent Registration' + colors.reset);
+    console.log('\nRegister as an agent in this swarm:\n');
+    console.log(colors.bold + 'Usage:' + colors.reset);
+    console.log('  imece join --name <name> --role <role> [--caps <c1,c2>] [--model <model>] [--lead]');
+    console.log('\n' + colors.bold + 'Available roles:' + colors.reset);
+    console.log('  architect  - System design, API design, code review');
+    console.log('  developer  - Feature implementation, bug fixes');
+    console.log('  tester     - Test writing, QA, test coverage');
+    console.log('  reviewer   - Code review, PR review');
+    console.log('  devops     - CI/CD, deployment, infrastructure');
+    console.log('  docs       - Documentation, examples');
+    console.log('\n' + colors.bold + 'Example:' + colors.reset);
+    console.log('  imece join --name ali --role architect --caps "api,backend" --lead');
+    console.log('');
+    process.exit(1);
+  }
+
+  try {
+    const agent = await imece.agents.register({
+      name,
+      role,
+      capabilities: caps,
+      model,
+      isLead
+    });
+
+    success('Agent ' + colors.cyan + agent.name + colors.reset + ' registered as ' + colors.yellow + agent.role + colors.reset);
+    if (isLead) info('Set as team lead 👑');
+    await imece.timeline.broadcast(name, name + ' (' + role + ') joined the swarm');
+    info('Next: Run "imece inbox ' + name + '" to check for messages');
+  } catch (e) {
+    error((e as Error).message);
+    process.exit(1);
+  }
+}
+
+async function handleTest(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+
+  if (!(await imece.isInitialized())) {
+    error('imece is not initialized. Run: imece init');
+    process.exit(1);
+  }
+
+  const filepath = args.args[0];
+  if (!filepath) {
+    error('Usage: imece test <filepath> [--to <agent>] [--desc <text>]');
+    console.log('\nExamples:');
+    console.log('  imece test src/api/users.ts');
+    console.log('  imece test src/api/users.ts --to minimax');
+    process.exit(1);
+  }
+
+  const targetAgent = args.flags.to as string | undefined;
+  let testerName: string;
+
+  if (!targetAgent) {
+    const agents = await imece.agents.list();
+    const tester = agents.find(a => a.role === 'tester' || a.capabilities.some(c => c.includes('test')));
+    if (!tester) {
+      error('No tester agent found. Register one or use --to <agent>');
+      process.exit(1);
+    }
+    testerName = tester.name;
+    info('Auto-detected tester: ' + testerName);
+  } else {
+    testerName = targetAgent;
+  }
+
+  const agents = await imece.agents.list();
+  const currentAgent = agents.find(a => a.status === 'online' && (a.role.includes('architect') || a.role.includes('developer')));
+  const fromName = currentAgent?.name ?? 'system';
+  const componentName = filepath.replace(/\.(ts|js|tsx|jsx|py|go|rs)$/, '').split(/[/\\]/).pop() ?? 'component';
+  const desc = (args.flags.desc as string | undefined) ?? '';
+
+  try {
+    const task = await imece.tasks.create({
+      createdBy: fromName,
+      assignedTo: testerName,
+      title: 'Write tests for ' + componentName,
+      description: 'Create comprehensive tests for `' + filepath + '`.\n\n' + desc,
+      acceptanceCriteria: ['Unit tests', 'Edge cases', 'Integration tests'],
+      priority: 'normal',
+      tags: ['test', componentName]
+    });
+    await imece.tasks.delegate(task, imece.messages);
+    success('Test task created: ' + task.id);
+    info('Assigned to: ' + testerName);
+  } catch (e) {
+    error((e as Error).message);
+    process.exit(1);
+  }
+}
+
+async function handleInstallCommands(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+  const dest = await imece.installCommands(args.flags.dir as string | undefined);
+  success('AI tool commands installed to: ' + dest);
+}
+
+async function handleNotify(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+  const [from, ...messageParts] = args.args;
+  const message = messageParts.join(' ');
+
+  if (!from || !message) {
+    error('Usage: imece notify <from> <message>');
+    process.exit(1);
+  }
+
+  const agents = await imece.agents.list();
+  const onlineAgents = agents.filter(a => a.name !== from && a.status !== 'offline');
+
+  if (onlineAgents.length === 0) {
+    info('No other online agents to notify');
+    return;
+  }
+
+  // Send message to all online agents
+  for (const agent of onlineAgents) {
+    await imece.messages.send({
+      from,
+      to: agent.name,
+      subject: 'Broadcast: ' + message.substring(0, 50),
+      body: message,
+      type: 'status-update',
+      priority: (args.flags.priority as 'low' | 'normal' | 'high' | 'urgent') ?? 'normal'
+    });
+  }
+
+  success('Notification sent to ' + onlineAgents.length + ' agent(s)');
+}
+
+async function handleReview(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+  const filepath = args.args[0];
+
+  if (!filepath) {
+    error('Usage: imece review <filepath> [--from <agent>] [--desc <text>]');
+    process.exit(1);
+  }
+
+  // Find code reviewer
+  const agents = await imece.agents.list();
+  const reviewer = agents.find(a =>
+    a.role.includes('review') ||
+    a.capabilities.some(c => c.includes('review'))
+  );
+
+  if (!reviewer) {
+    error('No code reviewer found. Register one with: imece join --name <name> --role reviewer');
+    process.exit(1);
+  }
+
+  const fromName = (args.flags.from as string | undefined) ?? 'system';
+  const desc = (args.flags.desc as string | undefined) ?? '';
+
+  const task = await imece.tasks.create({
+    createdBy: fromName,
+    assignedTo: reviewer.name,
+    title: 'Code review: ' + filepath,
+    description: 'Review code changes in `' + filepath + '`\n\n' + desc,
+    acceptanceCriteria: [
+      'Code quality check',
+      'Best practices compliance',
+      'Performance considerations',
+      'Approval or feedback provided'
+    ],
+    priority: 'normal',
+    tags: ['review', 'code-quality']
+  });
+
+  await imece.tasks.delegate(task, imece.messages);
+  success('Review task created: ' + task.id);
+  info('Assigned to reviewer: ' + reviewer.name);
+}
+
+async function handleStandup(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+
+  if (!(await imece.isInitialized())) {
+    error('imece is not initialized');
+    process.exit(1);
+  }
+
+  console.log('\n' + colors.bold + colors.cyan + '📅 TEAM STANDUP' + colors.reset);
+  console.log('Time: ' + new Date().toLocaleString());
+  console.log('');
+
+  const [agents, tasks, timeline] = await Promise.all([
+    imece.agents.list(),
+    imece.tasks.all(),
+    imece.timeline.recent(10)
+  ]);
+
+  // Agent status
+  console.log(colors.bold + '👥 TEAM MEMBERS' + colors.reset);
+  for (const agent of agents) {
+    const statusIcon = agent.status === 'online' ? '🟢' :
+                      agent.status === 'busy' ? '🔴' :
+                      agent.status === 'idle' ? '🟡' : '⚪';
+    const leadIcon = agent.isLead ? '👑 ' : '';
+    console.log('  ' + statusIcon + ' ' + leadIcon + agent.name + ' (' + agent.role + ')');
+    if (agent.currentTask) {
+      console.log('     └─ Working on: ' + agent.currentTask);
+    }
+  }
+  console.log('');
+
+  // Task summary
+  const activeTasks = tasks.filter(t => t.status === 'active');
+  const pendingTasks = tasks.filter(t => t.status === 'pending');
+  const doneToday = tasks.filter(t => {
+    if (t.status !== 'done' || !t.completedAt) return false;
+    const completed = new Date(t.completedAt);
+    const today = new Date();
+    return completed.toDateString() === today.toDateString();
+  });
+
+  console.log(colors.bold + '📊 TASK BOARD' + colors.reset);
+  console.log('  Active: ' + colors.yellow + activeTasks.length + colors.reset);
+  console.log('  Pending: ' + colors.cyan + pendingTasks.length + colors.reset);
+  console.log('  Done today: ' + colors.green + doneToday.length + colors.reset);
+  console.log('');
+
+  if (activeTasks.length > 0) {
+    console.log(colors.bold + '🔄 ACTIVE WORK' + colors.reset);
+    for (const task of activeTasks) {
+      console.log('  • ' + task.assignedTo + ': ' + task.title);
+    }
+    console.log('');
+  }
+
+  if (doneToday.length > 0) {
+    console.log(colors.bold + '✅ COMPLETED TODAY' + colors.reset);
+    for (const task of doneToday) {
+      console.log('  • ' + task.title + ' (' + task.assignedTo + ')');
+    }
+    console.log('');
+  }
+
+  // Recent activity
+  console.log(colors.bold + '📢 RECENT ACTIVITY' + colors.reset);
+  for (const event of timeline.slice(0, 5)) {
+    console.log('  [' + event.agent + '] ' + event.message);
+  }
+  console.log('');
+}
+
+async function handleAssign(args: ParsedArgs): Promise<void> {
+  const imece = new ImeceManager();
+  const [title, ...descParts] = args.args;
+  const description = descParts.join(' ');
+
+  if (!title) {
+    error('Usage: imece assign <title> --to-role <role> [--from <agent>] [--desc <text>]');
+    console.log('\nExample:');
+    console.log('  imece assign "Fix auth bug" --to-role developer --from kimibey');
+    process.exit(1);
+  }
+
+  const targetRole = args.flags['to-role'] as string | undefined;
+  if (!targetRole) {
+    error('Required: --to-role <role>');
+    console.log('\nAvailable roles: architect, developer, tester, reviewer, devops, docs');
+    process.exit(1);
+  }
+
+  const agents = await imece.agents.list();
+  const candidates = agents.filter(a =>
+    a.role === targetRole ||
+    a.role.includes(targetRole) ||
+    a.capabilities.some(c => c.includes(targetRole))
+  );
+
+  if (candidates.length === 0) {
+    error('No agents found with role: ' + targetRole);
+    console.log('\nRegistered agents:');
+    for (const a of agents) {
+      console.log('  - ' + a.name + ' (' + a.role + ')');
+    }
+    process.exit(1);
+  }
+
+  // Pick the agent with least active tasks
+  const taskCounts = await Promise.all(
+    candidates.map(async a => ({
+      agent: a,
+      count: (await imece.tasks.getAgentTasks(a.name)).filter(t => t.status === 'active').length
+    }))
+  );
+
+  taskCounts.sort((a, b) => a.count - b.count);
+  const selected = taskCounts[0]?.agent;
+
+  if (!selected) {
+    error('Could not select an agent for assignment');
+    process.exit(1);
+  }
+
+  const fromName = (args.flags.from as string | undefined) ?? 'system';
+  const desc = (args.flags.desc as string | undefined) ?? description;
+
+  const task = await imece.tasks.create({
+    createdBy: fromName,
+    assignedTo: selected.name,
+    title,
+    description: desc,
+    acceptanceCriteria: ['Task completed', 'Tests pass', 'Code reviewed'],
+    priority: (args.flags.priority as 'low' | 'normal' | 'high' | 'urgent') ?? 'normal',
+    tags: [targetRole]
+  });
+
+  await imece.tasks.delegate(task, imece.messages);
+  success('Task assigned: ' + task.id);
+  info('Assigned to: ' + selected.name + ' (' + selected.role + ')');
+  info('Active tasks for this agent: ' + ((taskCounts[0]?.count ?? 0) + 1));
+}
+
+function detectModel(): string {
+  if (process.env.CLAUDE_MODEL) return process.env.CLAUDE_MODEL;
+  if (process.env.CURSOR_MODEL) return process.env.CURSOR_MODEL;
+  return 'unknown';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -903,6 +1333,7 @@ const commands: Record<string, () => Promise<void>> = {
   send: () => handleSend(args),
   inbox: () => handleInbox(args),
   read: () => handleRead(args),
+  check: () => handleCheck(args),
   reply: () => handleReply(args),
   broadcast: () => handleBroadcast(args),
   timeline: () => handleTimeline(args),
@@ -912,7 +1343,14 @@ const commands: Record<string, () => Promise<void>> = {
   unlock: () => handleUnlock(args),
   prompt: () => handlePrompt(args),
   'install-skill': () => handleInstallSkill(args),
+  'install-commands': () => handleInstallCommands(args),
   thread: () => handleThread(args),
+  join: () => handleJoin(args),
+  test: () => handleTest(args),
+  notify: () => handleNotify(args),
+  review: () => handleReview(args),
+  standup: () => handleStandup(args),
+  assign: () => handleAssign(args),
 };
 
 // Handle task subcommands

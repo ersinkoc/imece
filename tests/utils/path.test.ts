@@ -24,6 +24,19 @@ describe('Path utilities', () => {
     it('should handle Windows-style paths', () => {
       expect(encodePath('src\\api\\users.ts')).toBe('src__api__users.ts');
     });
+
+    it('should handle empty string', () => {
+      expect(encodePath('')).toBe('');
+    });
+
+    it('should handle multiple consecutive separators', () => {
+      // Code keeps multiple underscores
+      expect(encodePath('src//api///users.ts')).toBe('src____api______users.ts');
+    });
+
+    it('should handle path with only separators', () => {
+      expect(encodePath('///')).toBe('');
+    });
   });
 
   describe('decodePath', () => {

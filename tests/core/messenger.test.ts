@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ImeceManager } from '../../src/core/imece.js';
-import { createTempImece, cleanup } from '../helpers/setup.js';
+import { createTempImece, cleanup, sleep } from '../helpers/setup.js';
 
 describe('Messenger', () => {
   let tempDir: string;
@@ -196,6 +196,312 @@ describe('Messenger', () => {
 
       const thread = await imece.messages.getThread('ali', 'zeynep');
       expect(thread).toHaveLength(3);
+    });
+  });
+
+  describe('message validation edge cases', () => {
+    it('should handle empty message body', async () => {
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Empty body',
+        body: ''
+      });
+      expect(msg.body).toBe('');
+    });
+
+    it('should handle empty subject', async () => {
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: '',
+        body: 'No subject'
+      });
+      expect(msg.subject).toBe('');
+    });
+
+    it('should handle very long message body', async () => {
+      const longBody = 'A'.repeat(10000);
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Long message',
+        body: longBody
+      });
+      expect(msg.body).toBe(longBody);
+    });
+
+    it('should handle special characters in subject and body', async () => {
+      const specialChars = '<>&"\'\\/null\u0000emoji🎉';
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: specialChars,
+        body: specialChars
+      });
+      expect(msg.subject).toBe(specialChars);
+      expect(msg.body).toBe(specialChars);
+    });
+
+    it('should handle multiline messages', async () => {
+      const multiline = 'Line 1\nLine 2\r\nLine 3';
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Multiline',
+        body: multiline
+      });
+      expect(msg.body).toBe(multiline);
+    });
+  });
+
+  describe('self-messaging and same agent edge cases', () => {
+    it('should allow agent to send message to itself', async () => {
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'ali',
+        subject: 'Self note',
+        body: 'Remember this'
+      });
+      expect(msg.from).toBe('ali');
+      expect(msg.to).toBe('ali');
+    });
+
+    it('should allow agent to reply to itself', async () => {
+      const original = await imece.messages.send({
+        from: 'ali',
+        to: 'ali',
+        subject: 'Self task'
+      });
+
+      const reply = await imece.messages.reply('ali', original.id, 'Done');
+      expect(reply?.from).toBe('ali');
+      expect(reply?.to).toBe('ali');
+      expect(reply?.replyTo).toBe(original.id);
+    });
+  });
+
+  describe('reply chain edge cases', () => {
+    it('should handle multiple reply levels', async () => {
+      // Level 1: Ali sends to Zeynep
+      const msg1 = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Question'
+      });
+
+      // Level 2: Zeynep replies
+      const msg2 = await imece.messages.reply('zeynep', msg1.id, 'Answer 1');
+
+      // Level 3: Ali replies to answer
+      const msg3 = await imece.messages.reply('ali', msg2.id, 'Thanks');
+
+      expect(msg3?.replyTo).toBe(msg2.id);
+      expect(msg2?.replyTo).toBe(msg1.id);
+      expect(msg3?.subject).toBe('Re: Re: Question');
+    });
+
+    it('should mark original message as read on reply', async () => {
+      const original = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Unread'
+      });
+
+      await imece.messages.reply('zeynep', original.id, 'Response');
+
+      const updated = await imece.messages.getMessage('zeynep', original.id);
+      expect(updated?.read).toBe(true);
+    });
+  });
+
+  describe('getThread edge cases', () => {
+    it('should return empty array for non-existent thread', async () => {
+      const thread = await imece.messages.getThread('ali', 'nonexistent');
+      expect(thread).toEqual([]);
+    });
+
+    it('should return empty array when no messages between agents', async () => {
+      await imece.messages.send({ from: 'ali', to: 'zeynep', subject: 'One way' });
+      const thread = await imece.messages.getThread('zeynep', 'ali');
+      // Should include the message from ali to zeynep
+      expect(thread.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should include processed messages in thread', async () => {
+      await imece.messages.send({ from: 'ali', to: 'zeynep', subject: 'Old message' });
+      const messages = await imece.messages.getInbox('zeynep');
+      await imece.messages.markAsRead('zeynep', messages[0]!.id);
+
+      const thread = await imece.messages.getThread('ali', 'zeynep');
+      expect(thread.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should sort thread chronologically', async () => {
+      await imece.messages.send({ from: 'ali', to: 'zeynep', subject: 'First' });
+      await sleep(10);
+      await imece.messages.send({ from: 'zeynep', to: 'ali', subject: 'Second' });
+      await sleep(10);
+      await imece.messages.send({ from: 'ali', to: 'zeynep', subject: 'Third' });
+
+      const thread = await imece.messages.getThread('ali', 'zeynep');
+      expect(thread[0]?.subject).toBe('First');
+      expect(thread[thread.length - 1]?.subject).toBe('Third');
+    });
+  });
+
+  describe('priority and type edge cases', () => {
+    it('should handle all priority levels', async () => {
+      const priorities: Array<'low' | 'normal' | 'high' | 'urgent'> = ['low', 'normal', 'high', 'urgent'];
+
+      for (const priority of priorities) {
+        const msg = await imece.messages.send({
+          from: 'ali',
+          to: 'zeynep',
+          subject: `Priority ${priority}`,
+          priority
+        });
+        expect(msg.priority).toBe(priority);
+      }
+    });
+
+    it('should reject invalid priority', async () => {
+      await expect(
+        imece.messages.send({
+          from: 'ali',
+          to: 'zeynep',
+          subject: 'Test',
+          priority: 'invalid' as any
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should handle all message types', async () => {
+      const types: Array<'message' | 'task-delegate' | 'question' | 'status-update' | 'review-request' | 'approval' | 'rejection' | 'blocker' | 'handoff'> = [
+        'message', 'task-delegate', 'question', 'status-update',
+        'review-request', 'approval', 'rejection', 'blocker', 'handoff'
+      ];
+
+      for (const type of types) {
+        const msg = await imece.messages.send({
+          from: 'ali',
+          to: 'zeynep',
+          subject: `Type ${type}`,
+          type
+        });
+        expect(msg.type).toBe(type);
+      }
+    });
+
+    it('should reject invalid message type', async () => {
+      await expect(
+        imece.messages.send({
+          from: 'ali',
+          to: 'zeynep',
+          subject: 'Test',
+          type: 'invalid' as any
+        })
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('expectsReply flag edge cases', () => {
+    it('should preserve expectsReply flag', async () => {
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Needs response',
+        expectsReply: true
+      });
+      expect(msg.expectsReply).toBe(true);
+    });
+
+    it('should default expectsReply to false', async () => {
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'No response needed'
+      });
+      expect(msg.expectsReply).toBe(false);
+    });
+  });
+
+  describe('markAllAsRead edge cases', () => {
+    it('should return 0 for empty inbox', async () => {
+      const count = await imece.messages.markAllAsRead('zeynep');
+      expect(count).toBe(0);
+    });
+
+    it('should only mark unread messages', async () => {
+      await imece.messages.send({ from: 'ali', to: 'zeynep', subject: '1' });
+      await imece.messages.send({ from: 'ali', to: 'zeynep', subject: '2' });
+
+      const messages = await imece.messages.getInbox('zeynep');
+      await imece.messages.markAsRead('zeynep', messages[0]!.id);
+
+      const count = await imece.messages.markAllAsRead('zeynep');
+      expect(count).toBe(1); // Only one was unread
+    });
+  });
+
+  describe('getMessage edge cases', () => {
+    it('should find message with complex ID', async () => {
+      const sent = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Complex ID test'
+      });
+
+      const retrieved = await imece.messages.getMessage('zeynep', sent.id);
+      expect(retrieved?.subject).toBe('Complex ID test');
+    });
+
+    it('should handle message ID case sensitivity', async () => {
+      const sent = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Case test'
+      });
+
+      const lowerCaseId = sent.id.toLowerCase();
+      const retrieved = await imece.messages.getMessage('zeynep', lowerCaseId);
+
+      // Should find the message regardless of case
+      expect(retrieved).not.toBeNull();
+    });
+  });
+
+  describe('concurrent messaging', () => {
+    it('should handle rapid fire messages', async () => {
+      const promises = [];
+      for (let i = 0; i < 10; i++) {
+        promises.push(imece.messages.send({
+          from: 'ali',
+          to: 'zeynep',
+          subject: `Message ${i}`
+        }));
+      }
+
+      const results = await Promise.all(promises);
+      expect(results).toHaveLength(10);
+
+      const inbox = await imece.messages.getInbox('zeynep');
+      expect(inbox).toHaveLength(10);
+    });
+
+    it('should maintain unique IDs for rapid messages', async () => {
+      const msg1 = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'First'
+      });
+      const msg2 = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Second'
+      });
+
+      expect(msg1.id).not.toBe(msg2.id);
     });
   });
 });

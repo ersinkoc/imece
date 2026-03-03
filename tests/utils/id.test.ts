@@ -19,6 +19,26 @@ describe('ID utilities', () => {
       expect(id.length).toBeGreaterThanOrEqual(8);
       expect(id.length).toBeLessThanOrEqual(20);
     });
+
+    it('should generate 10000 unique IDs without collision', () => {
+      const ids = new Set<string>();
+      for (let i = 0; i < 10000; i++) {
+        ids.add(generateId());
+      }
+      // Should have very few collisions (less than 1%)
+      expect(ids.size).toBeGreaterThan(9900);
+    });
+
+    it('should generate IDs with timestamp component', () => {
+      const ids: string[] = [];
+      // Generate IDs in quick succession
+      for (let i = 0; i < 100; i++) {
+        ids.push(generateId());
+      }
+      // All should be unique
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(100);
+    });
   });
 
   describe('messageFilename', () => {

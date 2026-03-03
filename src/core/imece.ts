@@ -331,6 +331,106 @@ When joining a swarm, broadcast your presence:
     await fs.promises.rm(this.imeceDir, { recursive: true, force: true });
   }
 
+  /**
+   * Install AI tool commands to project
+   * @param targetDir - Target directory (default: .)
+   * @returns Path to installed commands directory
+   */
+  async installCommands(targetDir?: string): Promise<string> {
+    const baseDir = targetDir ?? '.';
+    const commandsDir = baseDir + '/.imece/commands';
+
+    await ensureDir(commandsDir);
+
+    // Create join script using string concatenation
+    const joinScript = [
+      '#!/bin/bash',
+      '# imece-join: Universal join script for any AI assistant',
+      '',
+      'NAME="${1:-agent}"',
+      'ROLE="${2:-developer}"',
+      'MODEL="${3:-unknown}"',
+      '',
+      '# Auto-detect based on name',
+      'if [[ "$NAME" == *"claude"* ]]; then',
+      '  ROLE="${2:-architect}"',
+      '  MODEL="claude-opus-4"',
+      'elif [[ "$NAME" == *"cursor"* ]]; then',
+      '  ROLE="${2:-developer}"',
+      '  MODEL="cursor-default"',
+      'elif [[ "$NAME" == *"copilot"* ]]; then',
+      '  ROLE="${2:-reviewer}"',
+      '  MODEL="github-copilot"',
+      'elif [[ "$NAME" == *"windsurf"* ]]; then',
+      '  ROLE="${2:-fullstack}"',
+      '  MODEL="windsurf-default"',
+      'elif [[ "$NAME" == *"tester"* ]] || [[ "$NAME" == *"test"* ]]; then',
+      '  ROLE="tester"',
+      'fi',
+      '',
+      'echo "Joining imece swarm as: $NAME ($ROLE)"',
+      'imece join --name "$NAME" --role "$ROLE" --model "$MODEL"',
+      '',
+      'echo ""',
+      'echo "Next steps:"',
+      'echo "  imece inbox $NAME"',
+      'echo "  imece status"'
+    ].join('\n');
+
+    // Create test script
+    const testScript = [
+      '#!/bin/bash',
+      '# imece-test: Delegate testing to tester agent',
+      '',
+      'FILE="$1"',
+      'DESC="$2"',
+      '',
+      'if [ -z "$FILE" ]; then',
+      '  echo "Usage: imece-test <filepath> [description]"',
+      '  echo "Example: imece-test src/api/users.ts"',
+      '  exit 1',
+      'fi',
+      '',
+      'if [ -n "$DESC" ]; then',
+      '  imece test "$FILE" --desc "$DESC"',
+      'else',
+      '  imece test "$FILE"',
+      'fi'
+    ].join('\n');
+
+    // Create inbox script
+    const inboxScript = [
+      '#!/bin/bash',
+      '# imece-inbox: Check messages for agent',
+      '',
+      'AGENT="$1"',
+      '',
+      'if [ -z "$AGENT" ]; then',
+      '  echo "Usage: imece-inbox <agent-name>"',
+      '  exit 1',
+      'fi',
+      '',
+      'imece inbox "$AGENT"'
+    ].join('\n');
+
+    const fs = await import('fs');
+
+    await fs.promises.writeFile(commandsDir + '/imece-join.sh', joinScript, 'utf8');
+    await fs.promises.writeFile(commandsDir + '/imece-test.sh', testScript, 'utf8');
+    await fs.promises.writeFile(commandsDir + '/imece-inbox.sh', inboxScript, 'utf8');
+
+    // Make scripts executable (best effort)
+    try {
+      await fs.promises.chmod(commandsDir + '/imece-join.sh', 0o755);
+      await fs.promises.chmod(commandsDir + '/imece-test.sh', 0o755);
+      await fs.promises.chmod(commandsDir + '/imece-inbox.sh', 0o755);
+    } catch {
+      // Ignore chmod errors (Windows, etc.)
+    }
+
+    return commandsDir;
+  }
+
   private getProjectName(): string {
     try {
       const fs = require('fs');

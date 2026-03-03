@@ -312,4 +312,148 @@ describe('AgentManager', () => {
       expect(updated).toBeNull();
     });
   });
+
+  describe('edge cases', () => {
+    it('should handle empty capabilities array', async () => {
+      const agent = await imece.agents.register({
+        name: 'ali',
+        role: 'dev',
+        capabilities: []
+      });
+
+      expect(agent.capabilities).toEqual([]);
+    });
+
+    it('should handle multiple capabilities', async () => {
+      const agent = await imece.agents.register({
+        name: 'ali',
+        role: 'dev',
+        capabilities: ['typescript', 'react', 'node', 'python', 'go']
+      });
+
+      expect(agent.capabilities).toHaveLength(5);
+    });
+
+    it('should update status back to online', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await imece.agents.updateStatus('ali', 'busy');
+
+      const updated = await imece.agents.updateStatus('ali', 'online');
+      expect(updated?.status).toBe('online');
+    });
+
+    it('should clear current task when going offline', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await imece.agents.updateStatus('ali', 'busy', 'task_123');
+
+      await imece.agents.goOffline('ali');
+      const agent = await imece.agents.get('ali');
+
+      expect(agent?.currentTask).toBeNull();
+      expect(agent?.filesWorkingOn).toEqual([]);
+    });
+
+    it('should handle case-insensitive names in get', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+
+      const agent = await imece.agents.get('ALI');
+      expect(agent?.name).toBe('ali');
+    });
+
+    it('should handle case-insensitive names in list', async () => {
+      await imece.agents.register({ name: 'Ali', role: 'dev' });
+
+      const agents = await imece.agents.list();
+      expect(agents[0]?.name).toBe('ali');
+    });
+
+    it('should keep current task when changing status', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await imece.agents.updateStatus('ali', 'busy', 'task_123');
+
+      const updated = await imece.agents.updateStatus('ali', 'idle');
+      // Status changes but task remains assigned
+      expect(updated?.currentTask).toBe('task_123');
+    });
+
+    it('should clear working files', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await imece.agents.setWorkingFiles('ali', ['file1.ts', 'file2.ts']);
+
+      const cleared = await imece.agents.setWorkingFiles('ali', []);
+      expect(cleared?.filesWorkingOn).toEqual([]);
+    });
+
+    it('should keep existing meta when updating', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await imece.agents.updateMeta('ali', { key1: 'value1' });
+      await imece.agents.updateMeta('ali', { key2: 'value2' });
+
+      const agent = await imece.agents.get('ali');
+      expect(agent?.meta).toHaveProperty('key1');
+      expect(agent?.meta).toHaveProperty('key2');
+    });
+  });
+
+  describe('geleme edge cases', () => {
+    it('should reject empty name in register', async () => {
+      await expect(
+        imece.agents.register({ name: '', role: 'dev' })
+      ).rejects.toThrow();
+    });
+
+    it('should handle null status gracefully', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      // Should not throw when status is null
+      await expect(
+        imece.agents.updateStatus('ali', null as any)
+      ).rejects.toThrow();
+    });
+
+    it('should handle undefined status gracefully', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await expect(
+        imece.agents.updateStatus('ali', undefined as any)
+      ).rejects.toThrow();
+    });
+
+    it('should mark agent as stale after 5 minutes', async () => {
+      const agent = await imece.agents.register({ name: 'ali', role: 'dev' });
+
+      // Simulate old lastSeen (6 minutes ago)
+      agent.lastSeen = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+      const fs = await import('fs/promises');
+      await fs.writeFile(
+        `${tempDir}/.imece/agents/ali.json`,
+        JSON.stringify(agent, null, 2),
+        'utf8'
+      );
+
+      const active = await imece.agents.listActive(300); // 5 min threshold
+      expect(active).toHaveLength(0);
+    });
+
+    it('should consider agent active within 5 minutes', async () => {
+      const agent = await imece.agents.register({ name: 'ali', role: 'dev' });
+
+      // lastSeen is recent (1 minute ago)
+      agent.lastSeen = new Date(Date.now() - 1 * 60 * 1000).toISOString();
+      const fs = await import('fs/promises');
+      await fs.writeFile(
+        `${tempDir}/.imece/agents/ali.json`,
+        JSON.stringify(agent, null, 2),
+        'utf8'
+      );
+
+      const active = await imece.agents.listActive(300);
+      expect(active).toHaveLength(1);
+    });
+
+    it('should handle duplicate name with different case', async () => {
+      await imece.agents.register({ name: 'ali', role: 'dev' });
+      await expect(
+        imece.agents.register({ name: 'ALI', role: 'tester' })
+      ).rejects.toThrow('already exists');
+    });
+  });
 });

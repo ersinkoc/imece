@@ -438,4 +438,93 @@ describe('TaskBoard', () => {
       expect(message.body).toContain('Criteria 2');
     });
   });
+
+  describe('edge cases', () => {
+    it('should handle complete with non-existent task', async () => {
+      const result = await imece.tasks.complete('nonexistent');
+      expect(result).toBeNull();
+    });
+
+    it('should throw when completing already done task', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test'
+      });
+
+      await imece.tasks.claim(task.id, 'zeynep');
+      await imece.tasks.complete(task.id);
+
+      await expect(
+        imece.tasks.complete(task.id)
+      ).rejects.toThrow('already completed');
+    });
+
+    it('should handle block with non-existent task', async () => {
+      const result = await imece.tasks.block('nonexistent', 'reason');
+      expect(result).toBeNull();
+    });
+
+    it('should add note with completion note parameter', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test'
+      });
+
+      const completed = await imece.tasks.complete(task.id, 'Finished!');
+      expect(completed?.notes).toHaveLength(1);
+      expect(completed?.notes[0]?.text).toBe('Finished!');
+    });
+
+    it('should handle unblock non-existent task', async () => {
+      const result = await imece.tasks.unblock('nonexistent');
+      expect(result).toBeNull();
+    });
+
+    it('should list multiple statuses correctly', async () => {
+      await imece.tasks.create({ createdBy: 'ali', assignedTo: 'zeynep', title: 'p1' });
+      const t2 = await imece.tasks.create({ createdBy: 'ali', assignedTo: 'zeynep', title: 'a1' });
+      await imece.tasks.claim(t2.id, 'zeynep');
+      const t3 = await imece.tasks.create({ createdBy: 'ali', assignedTo: 'zeynep', title: 'b1' });
+      await imece.tasks.claim(t3.id, 'zeynep');
+      await imece.tasks.block(t3.id, 'blocked');
+      const t4 = await imece.tasks.create({ createdBy: 'ali', assignedTo: 'zeynep', title: 'd1' });
+      await imece.tasks.claim(t4.id, 'zeynep');
+      await imece.tasks.complete(t4.id);
+
+      expect(await imece.tasks.listByStatus('pending')).toHaveLength(1);
+      expect(await imece.tasks.listByStatus('active')).toHaveLength(1);
+      expect(await imece.tasks.listByStatus('blocked')).toHaveLength(1);
+      expect(await imece.tasks.listByStatus('done')).toHaveLength(1);
+    });
+
+    it('should handle multiple tags', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test',
+        tags: ['urgent', 'backend', 'api', 'v2']
+      });
+
+      expect(task.tags).toHaveLength(4);
+      expect(task.tags).toContain('urgent');
+    });
+
+    it('should handle acceptance criteria', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test',
+        acceptanceCriteria: ['Code compiles', 'Tests pass', 'Docs updated']
+      });
+
+      expect(task.acceptanceCriteria).toHaveLength(3);
+    });
+
+    it('should return empty for agent with no tasks', async () => {
+      const tasks = await imece.tasks.getAgentTasks('nobody');
+      expect(tasks).toHaveLength(0);
+    });
+  });
 });

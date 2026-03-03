@@ -1,0 +1,202 @@
+# İmece - Universal Multi-Agent Coordination
+
+## Package Information
+
+- **Name**: imece
+- **Version**: 1.0.0
+- **Description**: File-based IPC system that lets multiple AI code assistants coordinate, communicate, and delegate tasks on the same codebase
+- **Author**: Ersin Koç (ersinkoc)
+- **License**: MIT
+- **Repository**: https://github.com/ersinkoc/imece
+
+## What is İmece?
+
+İmece is a universal multi-agent coordination protocol inspired by Claude Code's Agent Teams. It enables any AI code assistant (Claude, Cursor, Windsurf, Copilot, Cline, Aider, etc.) to:
+
+- **Communicate** via inbox-based messaging
+- **Coordinate** via shared task lists
+- **Collaborate** without conflicts via file locking
+- **Track** all activity via append-only timeline
+
+Unlike Claude Code's built-in Agent Teams (which is Claude-only and experimental), İmece is:
+- **Universal**: Works with any AI assistant that can read/write files
+- **File-based**: No servers, sockets, or databases
+- **Zero dependencies**: Uses only Node.js built-in APIs
+- **Concurrent safe**: Multiple agents can read/write simultaneously
+
+## Installation
+
+```bash
+npm install imece
+# or
+npx imece <command>
+```
+
+## Quick Start
+
+```bash
+# Initialize imece in your project
+npx imece init --desc "My multi-agent project"
+
+# Register agents
+npx imece register ali lead-architect --caps "arch,api" --lead
+npx imece register zeynep frontend-dev --caps "react,css"
+
+# Send messages
+npx imece send ali zeynep "Review needed" --body "Please review the auth PR"
+
+# Check inbox
+npx imece inbox zeynep
+
+# Create and assign tasks
+npx imece task create ali zeynep "Build login form" --priority high
+
+# Lock files before editing
+npx imece lock zeynep src/components/Login.tsx
+
+# View status
+npx imece status
+```
+
+## Core Concepts
+
+### Agent
+An AI assistant instance with a name, role, capabilities, and status. Agents register themselves and maintain their state in `.imece/agents/`.
+
+### Messages
+Inbox-based messaging system where each agent has their own queue. Messages can be of different types: task-delegate, question, review-request, etc.
+
+### Tasks
+Kanban-style task board with statuses: pending → active → done. Tasks can be blocked/unblocked and support dependencies.
+
+### Timeline
+Append-only event log that records every mutation. Used for debugging, auditing, and broadcasts.
+
+### File Locks
+Advisory locking to prevent edit conflicts. Before editing any file, agents should lock it.
+
+## API Overview
+
+```typescript
+import { ImeceManager } from 'imece';
+
+const imece = new ImeceManager();
+
+// Initialize
+await imece.init();
+
+// Agents
+const agent = await imece.agents.register({ name: 'ali', role: 'architect' });
+await imece.agents.heartbeat('ali');
+
+// Messages
+await imece.messages.send({
+  from: 'ali',
+  to: 'zeynep',
+  subject: 'Hello',
+  body: 'Please help with...'
+});
+
+// Tasks
+const task = await imece.tasks.create({
+  createdBy: 'ali',
+  assignedTo: 'zeynep',
+  title: 'Fix bug'
+});
+await imece.tasks.claim(task.id, 'zeynep');
+await imece.tasks.complete(task.id, 'All tests pass');
+
+// Locks
+await imece.locks.lock('zeynep', 'src/app.ts');
+await imece.locks.unlock('zeynep', 'src/app.ts');
+
+// Timeline
+await imece.timeline.broadcast('ali', 'Starting major refactor');
+```
+
+## CLI Reference
+
+### Core Commands
+- `imece init [--desc <text>]` - Initialize workspace
+- `imece status` - Show swarm status
+- `imece reset` - Reset workspace (destructive)
+
+### Agent Commands
+- `imece register <name> <role> [--caps <c1,c2>] [--model <m>] [--lead]` - Register agent
+- `imece whoami <name>` - Show agent profile
+- `imece agents` - List all agents
+- `imece heartbeat <name>` - Update heartbeat
+- `imece offline <name>` - Go offline
+
+### Message Commands
+- `imece send <from> <to> <subject> [--body <text>] [--type <t>] [--priority <p>]` - Send message
+- `imece inbox <agent> [--all]` - Check inbox
+- `imece read <agent> <msg-id>` - Mark as read
+- `imece reply <agent> <msg-id> <body>` - Reply to message
+- `imece thread <a1> <a2>` - Show conversation
+
+### Task Commands
+- `imece task create <from> <to> <title> [opts]` - Create task
+- `imece task list [--status <s>] [--agent <n>]` - List tasks
+- `imece task show <id>` - Show task details
+- `imece task claim <id> <agent>` - Claim task
+- `imece task complete <id> [--note <n>]` - Complete task
+- `imece task block <id> <reason>` - Block task
+- `imece task unblock <id>` - Unblock task
+
+### Timeline Commands
+- `imece broadcast <agent> <message>` - Broadcast message
+- `imece timeline [--limit <n>]` - Show recent events
+- `imece search <query>` - Search timeline
+
+### Lock Commands
+- `imece lock <agent> <filepath>` - Lock file
+- `imece unlock <agent> <filepath>` - Unlock file
+- `imece locks` - List locks
+
+### Utility Commands
+- `imece install-skill [--dir <path>]` - Install SKILL.md
+- `imece prompt <name> <role> [opts]` - Generate agent prompt
+
+## Directory Structure
+
+```
+.imece/
+├── imece.json           # Configuration
+├── agents/              # Agent profiles (JSON)
+├── inbox/               # Message queues
+│   ├── <agent>/
+│   └── <agent>/.processed/
+├── tasks/               # Kanban board
+│   ├── pending/
+│   ├── active/
+│   ├── done/
+│   └── blocked/
+├── locks/               # File locks (JSON)
+└── timeline.jsonl       # Event log (JSONL)
+```
+
+## Non-Negotiable Rules
+
+1. **Zero runtime dependencies** - Only Node.js built-in APIs
+2. **ESM only** - `"type": "module"`, all imports use `.js` extension
+3. **TypeScript strict** - strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes
+4. **Atomic writes** - All JSON writes use temp+rename pattern
+5. **Timeline truth** - Every mutation emits a timeline event
+6. **Concurrent safe** - File-based state supports multi-process access
+
+## For AI Assistants
+
+AI assistants should:
+
+1. Check `.imece/` at the start of every conversation
+2. Run `npx imece inbox <name>` to check for messages
+3. Run `npx imece status` to understand swarm state
+4. Lock files before editing with `npx imece lock`
+5. Update heartbeat regularly with `npx imece heartbeat`
+
+See `skill/SKILL.md` for the complete AI skill file.
+
+## License
+
+MIT © Ersin Koç

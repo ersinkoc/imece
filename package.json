@@ -1,0 +1,52 @@
+{
+  "name": "imece",
+  "version": "1.0.0",
+  "description": "Universal multi-agent coordination for AI code assistants — like imece, the Anatolian tradition of working together",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "imece": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run tests/e2e",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "benchmark": "vitest run benchmarks",
+    "ci": "npm run typecheck && npm run test && npm run build",
+    "prepublishOnly": "npm run ci && npm run test:coverage"
+  },
+  "files": ["dist", "templates", "skill", "llms.txt", "CHANGELOG.md", "LICENSE", "README.md"],
+  "keywords": [
+    "multi-agent", "imece", "coordination", "claude-code",
+    "ai-assistant", "ipc", "cursor", "windsurf", "copilot",
+    "cline", "aider", "task-delegation", "agent-teams", "swarm"
+  ],
+  "author": "Ersin Koç",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ersinkoc/imece.git"
+  },
+  "homepage": "https://github.com/ersinkoc/imece",
+  "engines": { "node": ">=22" },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "tsup": "^8.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

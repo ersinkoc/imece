@@ -1,0 +1,98 @@
+# Source files (not needed in package - we have dist/)
+src/
+tests/
+benchmarks/
+examples/
+
+# Test output
+.test-imece/
+.bench-temp/
+coverage/
+
+# Build config
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+
+# CI
+.github/
+
+# Documentation that's already in the package
+# (README.md, CHANGELOG.md, LICENSE are included via package.json files)
+
+# Development files
+.env
+.env.local
+.editorconfig
+.eslintrc*
+.prettierrc*
+.travis.yml
+.appveyor.yml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS generated files - Windows specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.tmp
+*.temp
+
+# Windows reserved device names that can cause issues
+nul
+NUL
+con
+CON
+prn
+PRN
+aux
+AUX
+com1
+COM1
+com2
+COM2
+com3
+COM3
+com4
+COM4
+lpt1
+LPT1
+lpt2
+LPT2
+lpt3
+LPT3
+
+# Editor
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# Cache
+.cache/
+.eslintcache
+.npm
+
+# git
+.git/
+.gitattributes
+.gitignore
+
+# npm
+*.tgz
+
+# Node modules (shouldn't be included but just in case)
+node_modules/

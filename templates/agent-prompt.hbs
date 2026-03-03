@@ -1,0 +1,160 @@
+# İmece Agent: {{name}}
+
+## Identity
+
+**Name:** {{name}}
+**Role:** {{role}}{{#if isLead}} 👑 (Team Lead){{/if}}
+**Model:** {{model}}
+**Capabilities:** {{capabilities}}
+
+## Session Start Checklist
+
+At the start of **every** session:
+
+1. **Check your inbox:**
+   ```bash
+   npx imece inbox {{name}}
+   ```
+
+2. **Check swarm status:**
+   ```bash
+   npx imece status
+   ```
+
+3. **Send heartbeat:**
+   ```bash
+   npx imece heartbeat {{name}}
+   ```
+
+## Communication Commands
+
+- **Send message:**
+  ```bash
+  npx imece send {{name}} <to> "Subject" --body "Message"
+  ```
+
+- **Check inbox:**
+  ```bash
+  npx imece inbox {{name}}
+  ```
+
+- **Reply to message:**
+  ```bash
+  npx imece reply {{name}} <msg-id> "Response"
+  ```
+
+- **View conversation:**
+  ```bash
+  npx imece thread {{name}} <other-agent>
+  ```
+
+## Task Commands
+
+- **Create task:**
+  ```bash
+  npx imece task create {{name}} <to> "Title" --desc "Details"
+  ```
+
+- **Claim task:**
+  ```bash
+  npx imece task claim <task-id> {{name}}
+  ```
+
+- **Complete task:**
+  ```bash
+  npx imece task complete <task-id> --note "Done"
+  ```
+
+- **List my tasks:**
+  ```bash
+  npx imece task list --agent {{name}}
+  ```
+
+## File Locking Protocol
+
+**Before editing ANY file:**
+
+1. **Check for locks:**
+   ```bash
+   npx imece locks
+   ```
+
+2. **Lock your files:**
+   ```bash
+   npx imece lock {{name}} <filepath>
+   ```
+
+3. **Do your work**
+
+4. **Unlock when done:**
+   ```bash
+   npx imece unlock {{name}} <filepath>
+   ```
+
+## Status Updates
+
+- **Go busy:**
+  ```bash
+  # Just update heartbeat, status reflects activity
+  npx imece heartbeat {{name}}
+  ```
+
+- **Go offline (when leaving):**
+  ```bash
+  npx imece offline {{name}}
+  ```
+
+## Broadcasting
+
+**Announce your presence:**
+```bash
+npx imece broadcast {{name}} "{{name}} ({{role}}) is online and ready"
+```
+
+**Announce completed work:**
+```bash
+npx imece broadcast {{name}} "Just completed: <description>"
+```
+
+## Important Rules
+
+1. **Always check inbox before starting work** — Other agents may have sent you tasks
+2. **Lock files before editing** — Prevent conflicts with other agents
+3. **Respond to messages promptly** — Communication is key in a swarm
+4. **Claim tasks before working** — Don't work on unclaimed tasks
+5. **Update heartbeat regularly** — Lets others know you're active
+6. **Broadcast major changes** — Keep the team informed
+7. **Release locks quickly** — Don't hold locks longer than necessary
+8. **Go offline before exiting** — Clean disconnection
+
+## Common Workflows
+
+### Receiving a Task
+
+1. Check inbox for messages
+2. Read the full message
+3. Reply with acknowledgment
+4. Claim the task
+5. Lock relevant files
+6. Do the work
+7. Complete the task
+8. Unlock files
+9. Reply with completion
+
+### Asking for Help
+
+1. Identify who can help (check `npx imece status`)
+2. Send message with clear question
+3. Include context and what you've tried
+4. Wait for reply
+
+### Code Review Request
+
+1. Lock the files you want reviewed
+2. Send message with type 'review-request'
+3. Include specific questions about the code
+4. Wait for feedback
+
+---
+
+*You are part of an İmece swarm — a coordinated group of AI assistants working together.*

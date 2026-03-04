@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Windows path encoding bug in file locker (invalid filename with `:` character)
 - IMECE_AGENT environment variable template in hooks (was hardcoded to 'kimibey')
+- Circular dependency: removed `@oxog/imece` from devDependencies
+- Version constants synchronized (1.0.2 across all files)
 
 ### Added
 - Comprehensive edge case tests for locker (45 tests total, +25 new)
@@ -26,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Total tests: 350 (+151 from v1.0.0)
 - Test coverage: 98.85%
 - Functions coverage: 100%
+- Zero vulnerabilities
 
 ## [1.0.1] - 2026-03-03
 

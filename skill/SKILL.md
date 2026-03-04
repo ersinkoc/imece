@@ -37,6 +37,7 @@ npx @oxog/imece broadcast <your-name> "<your-name> is online and ready"
 
 | Action | Command |
 |--------|---------|
+| Join swarm | `npx @oxog/imece join <name> <role> [--caps <list>] [--model <m>] [--lead]` |
 | Check messages | `npx @oxog/imece inbox <name>` |
 | Send message | `npx @oxog/imece send <from> <to> "Subject" --body "Message"` |
 | Reply | `npx @oxog/imece reply <name> <msg-id> "Response"` |

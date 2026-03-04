@@ -12,7 +12,7 @@ import { Timeline } from './timeline.js';
 import { FileLocker } from './locker.js';
 import type { ImeceConfig, ImeceStatus, StatusOptions, ImeceSettings } from '../types.js';
 
-const IMECE_VERSION = '1.0.0';
+const IMECE_VERSION = '1.0.2';
 const DEFAULT_SETTINGS: ImeceSettings = {
   staleThresholdSeconds: 300,
   maxAgents: 10,

@@ -1,6 +1,6 @@
 {
   "name": "@oxog/imece",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Universal multi-agent coordination for AI code assistants — like imece, the Anatolian tradition of working together",
   "type": "module",
   "main": "./dist/index.js",

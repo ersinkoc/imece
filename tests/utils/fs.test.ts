@@ -423,4 +423,25 @@ describe('File system utilities', () => {
       // Should complete without error
     });
   });
+
+  describe('readJson error handling', () => {
+    it('should return null for non-existent file', async () => {
+      const result = await readJson(join(TEST_DIR, 'nope.json'));
+      expect(result).toBeNull();
+    });
+
+    it('should return null for invalid JSON', async () => {
+      const filePath = join(TEST_DIR, 'bad.json');
+      await fs.writeFile(filePath, 'not json!!!', 'utf8');
+      const result = await readJson(filePath);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('readJsonl error handling', () => {
+    it('should return empty array for non-existent file', async () => {
+      const result = await readJsonl(join(TEST_DIR, 'nope.jsonl'));
+      expect(result).toEqual([]);
+    });
+  });
 });

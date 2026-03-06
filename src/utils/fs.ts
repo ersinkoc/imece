@@ -19,8 +19,10 @@ export async function readJson<T>(filePath: string): Promise<T | null> {
   try {
     const content = await fs.readFile(filePath, 'utf8');
     return JSON.parse(content) as T;
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    if (err instanceof SyntaxError) return null;
+    throw err;
   }
 }
 
@@ -85,12 +87,13 @@ export async function readJsonl<T>(filePath: string, limit?: number): Promise<T[
       try {
         results.push(JSON.parse(line) as T);
       } catch {
-        // Skip invalid lines
+        // Skip invalid lines (expected in JSONL with concurrent appends)
       }
     }
     return results;
-  } catch {
-    return [];
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
   }
 }
 

@@ -59,6 +59,13 @@ export class TaskBoard {
     validateAgentName(options.createdBy);
     validateAgentName(options.assignedTo);
 
+    if (options.description && options.description.length > 50_000) {
+      throw new Error('Task description exceeds 50,000 character limit');
+    }
+    if (options.title.length > 500) {
+      throw new Error('Task title exceeds 500 character limit');
+    }
+
     const priority = options.priority ? validatePriority(options.priority) : DEFAULT_PRIORITY;
 
     const id = generateId();
@@ -318,16 +325,14 @@ export class TaskBoard {
   async listByStatus(status: TaskStatus): Promise<ImeceTask[]> {
     validateTaskStatus(status);
     const files = await listJsonFiles(`${this.tasksDir}/${status}`);
-    const tasks: ImeceTask[] = [];
-
-    for (const file of files) {
-      const task = await readJson<ImeceTask>(`${this.tasksDir}/${status}/${file}`);
-      if (task) tasks.push(task);
-    }
-
-    return tasks.sort((a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    const results = await Promise.all(
+      files.map(f => readJson<ImeceTask>(`${this.tasksDir}/${status}/${f}`))
     );
+    return results
+      .filter((t): t is ImeceTask => t !== null)
+      .sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
   }
 
   /**
@@ -338,12 +343,8 @@ export class TaskBoard {
    */
   async all(): Promise<ImeceTask[]> {
     const statuses: TaskStatus[] = ['pending', 'active', 'done', 'blocked'];
-    const all: ImeceTask[] = [];
-
-    for (const status of statuses) {
-      const tasks = await this.listByStatus(status);
-      all.push(...tasks);
-    }
+    const results = await Promise.all(statuses.map(s => this.listByStatus(s)));
+    const all = results.flat();
 
     return all.sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

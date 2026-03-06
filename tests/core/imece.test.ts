@@ -24,7 +24,7 @@ describe('ImeceManager', () => {
       const config = await imece.getConfig();
       expect(config).not.toBeNull();
       expect(config?.description).toBe('Test project');
-      expect(config?.version).toBe('1.0.3');
+      expect(config?.version).toBe('1.0.4');
     });
 
     it('should reject double initialization', async () => {
@@ -58,7 +58,7 @@ describe('ImeceManager', () => {
       const config = await imece.getConfig();
       expect(config).toMatchObject({
         project: expect.any(String),
-        version: '1.0.3',
+        version: '1.0.4',
         description: 'My project',
         settings: {
           staleThresholdSeconds: 300,

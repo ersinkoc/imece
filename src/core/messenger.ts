@@ -3,7 +3,7 @@
  * Inspired by Agent Teams SendMessage
  */
 
-import { writeJson, readJson, listJsonFiles, moveFile, ensureDir, readDir } from '../utils/fs.js';
+import { writeJson, readJson, listJsonFiles, ensureDir } from '../utils/fs.js';
 import { now } from '../utils/time.js';
 import { generateId, messageFilename } from '../utils/id.js';
 import { validateAgentName } from '../utils/path.js';
@@ -55,6 +55,13 @@ export class Messenger {
     validateAgentName(options.from);
     validateAgentName(options.to);
 
+    if (options.body && options.body.length > 50_000) {
+      throw new Error('Message body exceeds 50,000 character limit');
+    }
+    if (options.subject.length > 500) {
+      throw new Error('Message subject exceeds 500 character limit');
+    }
+
     const priority = options.priority ? validatePriority(options.priority) : DEFAULT_PRIORITY;
     const type = options.type ? validateMessageType(options.type) : DEFAULT_TYPE;
 
@@ -97,18 +104,14 @@ export class Messenger {
    */
   async getInbox(agent: string, includeRead = false): Promise<ImeceMessage[]> {
     const files = await listJsonFiles(this.getInboxPath(agent));
-    const messages: ImeceMessage[] = [];
-
-    for (const file of files) {
-      const msg = await readJson<ImeceMessage>(this.getMessagePath(agent, file));
-      if (msg && (includeRead || !msg.read)) {
-        messages.push(msg);
-      }
-    }
-
-    return messages.sort((a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    const results = await Promise.all(
+      files.map(f => readJson<ImeceMessage>(this.getMessagePath(agent, f)))
     );
+    return results
+      .filter((msg): msg is ImeceMessage => msg !== null && (includeRead || !msg.read))
+      .sort((a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
   }
 
   /**
@@ -240,16 +243,14 @@ export class Messenger {
   /* c8 ignore start */
   async getProcessed(agent: string): Promise<ImeceMessage[]> {
     const files = await listJsonFiles(this.getProcessedPath(agent));
-    const messages: ImeceMessage[] = [];
-
-    for (const file of files) {
-      const msg = await readJson<ImeceMessage>(`${this.getProcessedPath(agent)}/${file}`);
-      if (msg) messages.push(msg);
-    }
-
-    return messages.sort((a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    const results = await Promise.all(
+      files.map(f => readJson<ImeceMessage>(`${this.getProcessedPath(agent)}/${f}`))
     );
+    return results
+      .filter((msg): msg is ImeceMessage => msg !== null)
+      .sort((a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
   }
   /* c8 ignore end */
 
@@ -262,22 +263,32 @@ export class Messenger {
    * const thread = await messenger.getThread('ali', 'zeynep');
    */
   async getThread(agent1: string, agent2: string): Promise<ImeceMessage[]> {
+    const seen = new Set<string>();
     const messages: ImeceMessage[] = [];
+
+    const addUnique = (msgs: ImeceMessage[]) => {
+      for (const m of msgs) {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          messages.push(m);
+        }
+      }
+    };
 
     // Get from agent1's inbox (messages from agent2)
     const inbox1 = await this.getInbox(agent1, true);
-    messages.push(...inbox1.filter(m => m.from === agent2));
+    addUnique(inbox1.filter(m => m.from === agent2));
 
     // Get from agent2's inbox (messages from agent1)
     const inbox2 = await this.getInbox(agent2, true);
-    messages.push(...inbox2.filter(m => m.from === agent1));
+    addUnique(inbox2.filter(m => m.from === agent1));
 
     // Get processed messages
     const processed1 = await this.getProcessed(agent1);
-    messages.push(...processed1.filter(m => m.from === agent2));
+    addUnique(processed1.filter(m => m.from === agent2));
 
     const processed2 = await this.getProcessed(agent2);
-    messages.push(...processed2.filter(m => m.from === agent1));
+    addUnique(processed2.filter(m => m.from === agent1));
 
     // Sort by timestamp
     return messages.sort((a, b) =>

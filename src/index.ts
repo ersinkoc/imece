@@ -99,6 +99,7 @@ export {
   sanitizeAgentName,
   validateAgentName,
   getLockFilename,
+  validateFilePath,
 } from './utils/path.js';
 
 export {
@@ -129,4 +130,4 @@ export {
 // VERSION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const VERSION = '1.0.3';
+export const VERSION = '1.0.4';

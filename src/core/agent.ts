@@ -95,14 +95,12 @@ export class AgentManager {
    */
   async list(): Promise<AgentProfile[]> {
     const files = await listJsonFiles(this.agentsDir);
-    const agents: AgentProfile[] = [];
-
-    for (const file of files) {
-      const agent = await readJson<AgentProfile>(`${this.agentsDir}/${file}`);
-      if (agent) agents.push(agent);
-    }
-
-    return agents.sort((a, b) => a.name.localeCompare(b.name));
+    const results = await Promise.all(
+      files.map(f => readJson<AgentProfile>(`${this.agentsDir}/${f}`))
+    );
+    return results
+      .filter((a): a is AgentProfile => a !== null)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**

@@ -3,20 +3,24 @@
  * Handles encoding/decoding of file paths for lock files
  */
 
+import { resolve, relative } from 'path';
+
 /**
  * Encode a file path for use as a lock filename
- * Replaces path separators with safe characters
+ * Replaces path separators with safe characters, escapes existing underscores
  * @param filePath - Original file path
- * @returns Encoded path like "src__api__users.ts"
+ * @returns Encoded path like "src_S_api_S_users.ts"
  * @example
- * encodePath('src/api/users.ts') // "src__api__users.ts"
- * encodePath('./src/api/users.ts') // "src__api__users.ts"
+ * encodePath('src/api/users.ts') // "src_S_api_S_users.ts"
+ * encodePath('./src/api/users.ts') // "src_S_api_S_users.ts"
  */
 export function encodePath(filePath: string): string {
   // Remove leading ./ or /
   const normalized = filePath.replace(/^[./\\]+/, '');
-  // Replace path separators with __
-  return normalized.replace(/[/\\]/g, '__');
+  // Escape existing _S_ sequences first, then replace separators
+  return normalized
+    .replace(/_S_/g, '_U_S_U_')
+    .replace(/[/\\]/g, '_S_');
 }
 
 /**
@@ -24,10 +28,28 @@ export function encodePath(filePath: string): string {
  * @param encoded - Encoded path
  * @returns Original file path like "src/api/users.ts"
  * @example
- * decodePath('src__api__users.ts') // "src/api/users.ts"
+ * decodePath('src_S_api_S_users.ts') // "src/api/users.ts"
  */
 export function decodePath(encoded: string): string {
-  return encoded.replace(/__/g, '/');
+  return encoded
+    .replace(/_S_/g, '/')
+    .replace(/_U_\/_U_/g, '_S_');
+}
+
+/**
+ * Validate that a file path stays within the project root
+ * @param filePath - File path to validate
+ * @param projectRoot - Project root directory
+ * @returns Normalized relative path
+ * @throws Error if path escapes project root
+ */
+export function validateFilePath(filePath: string, projectRoot: string): string {
+  const resolved = resolve(projectRoot, filePath);
+  const rel = relative(projectRoot, resolved);
+  if (rel.startsWith('..')) {
+    throw new Error(`Path '${filePath}' escapes project root`);
+  }
+  return rel;
 }
 
 /**

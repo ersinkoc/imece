@@ -12,7 +12,7 @@
  */
 export function generateId(): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 6);
+  const random = Math.random().toString(36).substring(2, 6).padEnd(4, '0');
   return `${timestamp}${random}`;
 }
 

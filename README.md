@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/@oxog/imece)](https://www.npmjs.com/package/@oxog/imece)
 [![CI](https://github.com/ersinkoc/imece/actions/workflows/ci.yml/badge.svg)](https://github.com/ersinkoc/imece/actions)
 [![license](https://img.shields.io/npm/l/imece)](LICENSE)
-[![coverage](https://img.shields.io/badge/coverage-98.85%25-brightgreen)]()
+[![coverage](https://img.shields.io/badge/coverage-98.53%25-brightgreen)]()
 
 ## What is imece?
 

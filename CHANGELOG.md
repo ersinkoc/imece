@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-03-06
+
+### Security
+- **Path traversal prevention**: Added `validateFilePath()` to file locking — rejects paths escaping project root
+- **Input length limits**: Message body/task description capped at 50K chars, subjects/titles at 500 chars
+- **Improved error handling**: `readJson`/`readJsonl` now distinguish ENOENT from permission/disk errors instead of silently swallowing all exceptions
+
+### Fixed
+- **CRITICAL**: `require('fs')` in ESM module replaced with static `readFileSync` import (caused silent fallback in `getProjectName()`)
+- **CRITICAL**: `handleReset` referenced module-level `args` instead of parameter — now takes `args: ParsedArgs` and only resets when `--confirm` is passed
+- **CRITICAL**: `--version` flag reported hardcoded `1.0.0` instead of actual version — now uses `VERSION` constant
+- **CRITICAL**: 278+ TypeScript compiler errors in CLI due to missing Node.js types — added `"types": ["node"]` to tsconfig
+- **HIGH**: Unsafe `as` type casts of CLI user input (`--type`, `--priority`, `--status`) replaced with proper validation
+- **HIGH**: `getThread()` could return duplicate messages — added ID-based deduplication
+- **MEDIUM**: `generateId()` random suffix could be empty when `Math.random()` returns 0 — added `.padEnd(4, '0')`
+- **MEDIUM**: `encodePath`/`decodePath` were not bijective (paths containing `__` decoded incorrectly) — switched to `_S_` encoding with escape mechanism
+
+### Changed
+- **Performance**: Sequential file reads in `list()`, `getInbox()`, `listLocks()`, `listByStatus()`, `all()`, `getProcessed()` parallelized with `Promise.all`
+- **Code quality**: Duplicate `formatRelativeTime` in CLI replaced with re-export from shared `time.ts`
+- **Code quality**: Unused imports (`moveFile`, `readDir`) removed from `messenger.ts`
+- **Code quality**: All 15 CLI catch blocks use safe error message extraction
+- **TypeScript**: Added `noFallthroughCasesInSwitch` to tsconfig.json
+- Version constants synchronized to 1.0.4
+
+### Stats
+- Total tests: 365 (+15 from v1.0.3)
+- Test coverage: 98.53% (statements), 97.06% (branches), 100% (functions)
+- Zero vulnerabilities
+
 ## [1.0.3] - 2026-03-04
 
 ### Changed
@@ -92,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform testing (Linux, Windows, macOS)
 - Node.js 22+ support
 
+[1.0.4]: https://github.com/ersinkoc/imece/releases/tag/v1.0.4
 [1.0.3]: https://github.com/ersinkoc/imece/releases/tag/v1.0.3
 [1.0.2]: https://github.com/ersinkoc/imece/releases/tag/v1.0.2
 [1.0.1]: https://github.com/ersinkoc/imece/releases/tag/v1.0.1

@@ -504,4 +504,34 @@ describe('Messenger', () => {
       expect(msg1.id).not.toBe(msg2.id);
     });
   });
+
+  describe('input limits', () => {
+    it('should reject message body exceeding 50,000 characters', async () => {
+      await expect(imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Test',
+        body: 'x'.repeat(50_001)
+      })).rejects.toThrow('Message body exceeds 50,000 character limit');
+    });
+
+    it('should reject message subject exceeding 500 characters', async () => {
+      await expect(imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'x'.repeat(501),
+        body: 'test'
+      })).rejects.toThrow('Message subject exceeds 500 character limit');
+    });
+
+    it('should accept message body at exactly 50,000 characters', async () => {
+      const msg = await imece.messages.send({
+        from: 'ali',
+        to: 'zeynep',
+        subject: 'Test',
+        body: 'x'.repeat(50_000)
+      });
+      expect(msg.body).toHaveLength(50_000);
+    });
+  });
 });

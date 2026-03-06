@@ -527,4 +527,34 @@ describe('TaskBoard', () => {
       expect(tasks).toHaveLength(0);
     });
   });
+
+  describe('input limits', () => {
+    it('should reject task description exceeding 50,000 characters', async () => {
+      await expect(imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test',
+        description: 'x'.repeat(50_001)
+      })).rejects.toThrow('Task description exceeds 50,000 character limit');
+    });
+
+    it('should reject task title exceeding 500 characters', async () => {
+      await expect(imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'x'.repeat(501),
+        description: 'test'
+      })).rejects.toThrow('Task title exceeds 500 character limit');
+    });
+
+    it('should accept task description at exactly 50,000 characters', async () => {
+      const task = await imece.tasks.create({
+        createdBy: 'ali',
+        assignedTo: 'zeynep',
+        title: 'Test',
+        description: 'x'.repeat(50_000)
+      });
+      expect(task.description).toHaveLength(50_000);
+    });
+  });
 });

@@ -3,6 +3,7 @@
  * Manages the .imece/ directory and provides access to all sub-managers
  */
 
+import { readFileSync } from 'fs';
 import { writeJson, readJson, ensureDir, exists, copyFile } from '../utils/fs.js';
 import { now } from '../utils/time.js';
 import { AgentManager } from './agent.js';
@@ -12,7 +13,7 @@ import { Timeline } from './timeline.js';
 import { FileLocker } from './locker.js';
 import type { ImeceConfig, ImeceStatus, StatusOptions, ImeceSettings } from '../types.js';
 
-const IMECE_VERSION = '1.0.3';
+const IMECE_VERSION = '1.0.4';
 const DEFAULT_SETTINGS: ImeceSettings = {
   staleThresholdSeconds: 300,
   maxAgents: 10,
@@ -433,8 +434,7 @@ When joining a swarm, broadcast your presence:
 
   private getProjectName(): string {
     try {
-      const fs = require('fs');
-      const pkg = JSON.parse(fs.readFileSync(`${this.projectRoot}/package.json`, 'utf8'));
+      const pkg = JSON.parse(readFileSync(`${this.projectRoot}/package.json`, 'utf8'));
       return pkg.name ?? 'unknown';
     } catch {
       return this.projectRoot.split('/').pop()?.split('\\').pop() ?? 'unknown';

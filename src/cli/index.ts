@@ -3,6 +3,8 @@
  */
 
 import { ImeceManager } from '../core/imece.js';
+import { VERSION } from '../index.js';
+import { validatePriority, validateMessageType, validateTaskStatus } from '../utils/validate.js';
 import { colors, icons, box, table, formatStatus, formatPriority, formatRelativeTime, success, error, info } from './ui.js';
 import type { AgentProfile, ImeceMessage, ImeceTask, TimelineEvent } from '../types.js';
 
@@ -166,7 +168,7 @@ async function handleInit(args: ParsedArgs): Promise<void> {
       console.log(`  Description: ${desc}`);
     }
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -253,7 +255,7 @@ async function handleStatus(): Promise<void> {
   }
 }
 
-async function handleReset(): Promise<void> {
+async function handleReset(args: ParsedArgs): Promise<void> {
   const imece = new ImeceManager();
 
   if (!(await imece.isInitialized())) {
@@ -261,13 +263,14 @@ async function handleReset(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`${colors.red}⚠ WARNING: This will delete all imece data!${colors.reset}`);
-  console.log('To confirm, run: imece reset --confirm');
-
-  if (args.flags.confirm) {
-    await imece.reset();
-    success('imece has been reset');
+  if (!args.flags.confirm) {
+    console.log(`${colors.red}⚠ WARNING: This will delete all imece data!${colors.reset}`);
+    console.log('To confirm, run: imece reset --confirm');
+    return;
   }
+
+  await imece.reset();
+  success('imece has been reset');
 }
 
 async function handleRegister(args: ParsedArgs): Promise<void> {
@@ -302,7 +305,7 @@ async function handleRegister(args: ParsedArgs): Promise<void> {
       info('Set as team lead 👑');
     }
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -411,13 +414,13 @@ async function handleSend(args: ParsedArgs): Promise<void> {
       to,
       subject,
       body: (args.flags.body as string | undefined) ?? '',
-      type: (args.flags.type as import('../types.js').MessageType | undefined) ?? 'message',
-      priority: (args.flags.priority as import('../types.js').Priority | undefined) ?? 'normal'
+      type: validateMessageType((args.flags.type as string | undefined) ?? 'message'),
+      priority: validatePriority((args.flags.priority as string | undefined) ?? 'normal')
     });
 
     success(`Message sent to ${to} (${msg.id})`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -593,14 +596,14 @@ async function handleTaskCreate(args: ParsedArgs): Promise<void> {
       title,
       description: (args.flags.desc as string | undefined) ?? '',
       acceptanceCriteria: criteria,
-      priority: (args.flags.priority as import('../types.js').Priority | undefined) ?? 'normal',
+      priority: validatePriority((args.flags.priority as string | undefined) ?? 'normal'),
       tags
     });
 
     success(`Task created: ${task.id}`);
     info(`Assigned to: ${to}`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -612,7 +615,7 @@ async function handleTaskList(args: ParsedArgs): Promise<void> {
 
   let tasks: ImeceTask[];
   if (status) {
-    tasks = await imece.tasks.listByStatus(status as import('../types.js').TaskStatus);
+    tasks = await imece.tasks.listByStatus(validateTaskStatus(status));
   } else if (agent) {
     tasks = await imece.tasks.getAgentTasks(agent);
   } else {
@@ -677,7 +680,7 @@ async function handleTaskClaim(args: ParsedArgs): Promise<void> {
     await imece.tasks.claim(taskId, agent);
     success(`Task ${taskId} claimed by ${agent}`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -696,7 +699,7 @@ async function handleTaskComplete(args: ParsedArgs): Promise<void> {
     await imece.tasks.complete(taskId, note);
     success(`Task ${taskId} completed`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -715,7 +718,7 @@ async function handleTaskBlock(args: ParsedArgs): Promise<void> {
     await imece.tasks.block(taskId, reason);
     success(`Task ${taskId} blocked`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -733,7 +736,7 @@ async function handleTaskUnblock(args: ParsedArgs): Promise<void> {
     await imece.tasks.unblock(taskId);
     success(`Task ${taskId} unblocked`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -811,7 +814,7 @@ async function handleLock(args: ParsedArgs): Promise<void> {
     await imece.locks.lock(agent, filepath);
     success(`Locked: ${filepath}`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -829,7 +832,7 @@ async function handleUnlock(args: ParsedArgs): Promise<void> {
     await imece.locks.unlock(agent, filepath);
     success(`Unlocked: ${filepath}`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -957,7 +960,7 @@ async function handleTaskDelegate(args: ParsedArgs): Promise<void> {
     await imece.tasks.delegate(task, imece.messages);
     success(`Task delegated: ${task.id}`);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -1008,7 +1011,7 @@ async function handleJoin(args: ParsedArgs): Promise<void> {
     await imece.timeline.broadcast(name, name + ' (' + role + ') joined the swarm');
     info('Next: Run "imece inbox ' + name + '" to check for messages');
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -1066,7 +1069,7 @@ async function handleTest(args: ParsedArgs): Promise<void> {
     success('Test task created: ' + task.id);
     info('Assigned to: ' + testerName);
   } catch (e) {
-    error((e as Error).message);
+    error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 }
@@ -1316,7 +1319,7 @@ if (!args.command || args.command === 'help' || args.flags.help || args.flags.h)
 
 // Handle version
 if (args.flags.version || args.flags.v) {
-  console.log('1.0.0');
+  console.log(VERSION);
   process.exit(0);
 }
 
@@ -1324,7 +1327,7 @@ if (args.flags.version || args.flags.v) {
 const commands: Record<string, () => Promise<void>> = {
   init: () => handleInit(args),
   status: () => handleStatus(),
-  reset: () => handleReset(),
+  reset: () => handleReset(args),
   register: () => handleRegister(args),
   whoami: () => handleWhoami(args),
   agents: () => handleAgents(),
@@ -1370,7 +1373,7 @@ if (args.command === 'task' && args.subcommand) {
   const handler = taskCommands[args.subcommand];
   if (handler) {
     handler().catch(e => {
-      error((e as Error).message);
+      error(e instanceof Error ? e.message : String(e));
       process.exit(1);
     });
   } else {
@@ -1381,7 +1384,7 @@ if (args.command === 'task' && args.subcommand) {
   const handler = commands[args.command];
   if (handler) {
     handler().catch(e => {
-      error((e as Error).message);
+      error(e instanceof Error ? e.message : String(e));
       process.exit(1);
     });
   } else {

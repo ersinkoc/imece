@@ -4,25 +4,26 @@ import {
   decodePath,
   sanitizeAgentName,
   validateAgentName,
-  getLockFilename
+  getLockFilename,
+  validateFilePath
 } from '../../src/utils/path.js';
 
 describe('Path utilities', () => {
   describe('encodePath', () => {
     it('should encode forward slashes', () => {
-      expect(encodePath('src/api/users.ts')).toBe('src__api__users.ts');
+      expect(encodePath('src/api/users.ts')).toBe('src_S_api_S_users.ts');
     });
 
     it('should handle nested paths', () => {
-      expect(encodePath('a/b/c/d.ts')).toBe('a__b__c__d.ts');
+      expect(encodePath('a/b/c/d.ts')).toBe('a_S_b_S_c_S_d.ts');
     });
 
     it('should remove leading dots', () => {
-      expect(encodePath('./src/file.ts')).toBe('src__file.ts');
+      expect(encodePath('./src/file.ts')).toBe('src_S_file.ts');
     });
 
     it('should handle Windows-style paths', () => {
-      expect(encodePath('src\\api\\users.ts')).toBe('src__api__users.ts');
+      expect(encodePath('src\\api\\users.ts')).toBe('src_S_api_S_users.ts');
     });
 
     it('should handle empty string', () => {
@@ -30,28 +31,38 @@ describe('Path utilities', () => {
     });
 
     it('should handle multiple consecutive separators', () => {
-      // Code keeps multiple underscores
-      expect(encodePath('src//api///users.ts')).toBe('src____api______users.ts');
+      expect(encodePath('src//api///users.ts')).toBe('src_S__S_api_S__S__S_users.ts');
     });
 
     it('should handle path with only separators', () => {
       expect(encodePath('///')).toBe('');
     });
+
+    it('should escape existing _S_ sequences', () => {
+      expect(encodePath('src_S_file.ts')).toBe('src_U_S_U_file.ts');
+    });
   });
 
   describe('decodePath', () => {
-    it('should decode double underscores', () => {
-      expect(decodePath('src__api__users.ts')).toBe('src/api/users.ts');
+    it('should decode _S_ to slashes', () => {
+      expect(decodePath('src_S_api_S_users.ts')).toBe('src/api/users.ts');
     });
 
     it('should handle multiple segments', () => {
-      expect(decodePath('a__b__c__d.ts')).toBe('a/b/c/d.ts');
+      expect(decodePath('a_S_b_S_c_S_d.ts')).toBe('a/b/c/d.ts');
     });
   });
 
   describe('roundtrip', () => {
     it('should preserve path after encode/decode', () => {
       const original = 'src/components/Button.tsx';
+      const encoded = encodePath(original);
+      const decoded = decodePath(encoded);
+      expect(decoded).toBe(original);
+    });
+
+    it('should preserve paths with underscores after encode/decode', () => {
+      const original = 'src/my__file.ts';
       const encoded = encodePath(original);
       const decoded = decodePath(encoded);
       expect(decoded).toBe(original);
@@ -115,11 +126,31 @@ describe('Path utilities', () => {
 
   describe('getLockFilename', () => {
     it('should generate lock filename', () => {
-      expect(getLockFilename('src/api/users.ts')).toBe('src__api__users.ts.lock.json');
+      expect(getLockFilename('src/api/users.ts')).toBe('src_S_api_S_users.ts.lock.json');
     });
 
     it('should handle simple paths', () => {
       expect(getLockFilename('file.txt')).toBe('file.txt.lock.json');
+    });
+  });
+
+  describe('validateFilePath', () => {
+    it('should accept paths within project root', () => {
+      const result = validateFilePath('src/file.ts', '/project');
+      expect(result).not.toContain('..');
+    });
+
+    it('should reject paths that escape project root', () => {
+      expect(() => validateFilePath('../../etc/passwd', '/project')).toThrow('escapes project root');
+    });
+
+    it('should reject paths with directory traversal in the middle', () => {
+      expect(() => validateFilePath('src/../../etc/passwd', '/project')).toThrow('escapes project root');
+    });
+
+    it('should accept nested paths', () => {
+      const result = validateFilePath('src/deep/nested/file.ts', '/project');
+      expect(result).not.toContain('..');
     });
   });
 });

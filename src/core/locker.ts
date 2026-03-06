@@ -4,7 +4,7 @@
 
 import { writeJson, readJson, listJsonFiles, removeFile, ensureDir } from '../utils/fs.js';
 import { now, isStale } from '../utils/time.js';
-import { encodePath, getLockFilename, validateAgentName } from '../utils/path.js';
+import { encodePath, getLockFilename, validateAgentName, validateFilePath } from '../utils/path.js';
 import type { FileLock, AgentProfile } from '../types.js';
 import type { Timeline } from './timeline.js';
 
@@ -12,10 +12,12 @@ const DEFAULT_STALE_THRESHOLD = 3600; // 1 hour
 
 export class FileLocker {
   private readonly locksDir: string;
+  private readonly projectRoot: string;
   private readonly timeline: Timeline;
 
   constructor(imeceDir: string, timeline: Timeline) {
     this.locksDir = `${imeceDir}/locks`;
+    this.projectRoot = imeceDir.replace(/[\\/]\.imece$/, '');
     this.timeline = timeline;
   }
 
@@ -35,6 +37,7 @@ export class FileLocker {
    */
   async lock(agent: string, filePath: string, reason?: string): Promise<FileLock> {
     validateAgentName(agent);
+    validateFilePath(filePath, this.projectRoot);
 
     const existing = await this.isLocked(filePath);
     if (existing && existing.agent !== agent) {
@@ -118,16 +121,14 @@ export class FileLocker {
    */
   async listLocks(): Promise<FileLock[]> {
     const files = await listJsonFiles(this.locksDir);
-    const locks: FileLock[] = [];
-
-    for (const file of files) {
-      const lock = await readJson<FileLock>(`${this.locksDir}/${file}`);
-      if (lock) locks.push(lock);
-    }
-
-    return locks.sort((a, b) =>
-      new Date(b.lockedAt).getTime() - new Date(a.lockedAt).getTime()
+    const results = await Promise.all(
+      files.map(f => readJson<FileLock>(`${this.locksDir}/${f}`))
     );
+    return results
+      .filter((l): l is FileLock => l !== null)
+      .sort((a, b) =>
+        new Date(b.lockedAt).getTime() - new Date(a.lockedAt).getTime()
+      );
   }
 
   /**
